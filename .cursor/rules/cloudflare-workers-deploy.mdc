@@ -12,13 +12,13 @@ This project deploys with **OpenNext on Cloudflare Workers**, not Pages / next-o
 
 | Setting | Value |
 |---------|--------|
-| Build | `pnpm run build:worker` or `opennextjs-cloudflare build` |
+| Build | `pnpm run build` / `pnpm run build:worker` (`opennextjs-cloudflare build`) |
 | Output | `.open-next/` (`main`: `.open-next/worker.js`, assets: `.open-next/assets`) |
-| Worker name | `bilauitmcuti-chat` |
+| Worker name | `chat` (`wrangler.jsonc`) |
 | Domain | `chat.bilauitmcuti.com` |
 | Compatibility | `nodejs_compat` |
 
-Scripts: `pnpm preview`, `pnpm deploy`, `pnpm upload` (preview versions).
+Scripts: `pnpm preview`, `pnpm deploy`, `pnpm upload` (preview versions). `build` and `build:worker` both run OpenNext.
 
 ## Workers Builds (Git) — dashboard must match
 
@@ -26,13 +26,11 @@ Worker → **Settings → Build**:
 
 | Setting | Value |
 |---------|--------|
-| Build command | `pnpm run build:worker` |
+| Build command | `pnpm run build` or `pnpm run build:worker` |
 | Deploy command | `npx wrangler deploy` |
 | Non-production deploy | `npx wrangler versions upload` or `pnpm run upload` |
 
-Never use `pnpm run build` (`next build` only) as the Workers Builds build command — it skips OpenNext and causes:
-
-`Could not find compiled Open Next config, did you run the build command?`
+Both build scripts run `opennextjs-cloudflare build` and produce `.open-next/`. Deploy fails with `Could not find compiled Open Next config` only if the build step skipped OpenNext (e.g. a custom command that runs `next build` alone).
 
 ## Bindings
 
@@ -43,7 +41,7 @@ Never use `pnpm run build` (`next build` only) as the Workers Builds build comma
 ## Do not
 
 - Reintroduce `@cloudflare/next-on-pages` or `pages_build_output_dir` without an explicit migration back to Pages.
-- Set `package.json` `"build"` to the OpenNext CLI (use `"build": "next build"` and `build:worker` for CF).
+- Change `package.json` `"build"` back to `next build` only — Workers Builds often calls `pnpm run build`; it must produce `.open-next/`.
 - Add a zone route `bilauitmcuti.com/_next/*` that steals apex calendar assets.
 
 ## Local verify

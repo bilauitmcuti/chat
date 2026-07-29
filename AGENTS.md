@@ -34,8 +34,8 @@ npx wrangler login             # required for local Workers AI binding
 | `pnpm install` | Install dependencies |
 | `pnpm lint` | Run ESLint |
 | `pnpm typecheck` | Run TypeScript check |
-| `pnpm build` | Next.js production build only (`next build`) |
-| `pnpm build:worker` | OpenNext Cloudflare Workers bundle → `.open-next/` |
+| `pnpm build` | OpenNext Cloudflare Workers bundle → `.open-next/` |
+| `pnpm build:worker` | Alias for `pnpm build` (same OpenNext bundle) |
 | `pnpm dev` | Next.js dev server (Workers AI via `initOpenNextCloudflareForDev`) |
 | `pnpm preview` | OpenNext build + local Workers preview |
 | `pnpm deploy` | OpenNext build + deploy to Cloudflare Workers |
@@ -62,7 +62,7 @@ This app deploys with **`@opennextjs/cloudflare`** (not Pages / next-on-pages).
 
 | Setting | Value |
 |---------|--------|
-| Worker name | `bilauitmcuti-chat` |
+| Worker name | `chat` |
 | Custom domain | `chat.bilauitmcuti.com` |
 | Compatibility | `nodejs_compat`, date ≥ `2024-09-23` |
 | AI binding | `AI` (remote) |
@@ -76,15 +76,15 @@ Secrets (dashboard or `wrangler secret put`): `TURNSTILE_SECRET_KEY`, Discord we
 
 ### Workers Builds (Git deploy) — required settings
 
-Dashboard: Worker **`bilauitmcuti-chat`** → **Settings → Build**.
+Dashboard: Worker **`chat`** → **Settings → Build**.
 
 | Setting | Value |
 |---------|--------|
-| Build command | `pnpm run build:worker` |
+| Build command | `pnpm run build` or `pnpm run build:worker` |
 | Deploy command | `npx wrangler deploy` |
 | Non-production deploy | `npx wrangler versions upload` (or `pnpm run upload` to build+upload in one step) |
 
-**Do not** set Build command to `pnpm run build` / `next build` alone — that does not create `.open-next/`. Without OpenNext build, deploy fails with:
+Both scripts run `opennextjs-cloudflare build` and create `.open-next/`. If the build step runs `next build` alone (or skips OpenNext), deploy fails with:
 
 `Could not find compiled Open Next config, did you run the build command?`
 

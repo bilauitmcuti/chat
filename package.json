@@ -7,7 +7,7 @@
     "node": ">=18"
   },
   "scripts": {
-    "build": "next build",
+    "build": "opennextjs-cloudflare build",
     "build:worker": "opennextjs-cloudflare build",
     "dev": "next dev",
     "lint": "eslint .",

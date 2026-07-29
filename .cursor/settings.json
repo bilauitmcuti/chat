@@ -1,0 +1,12 @@
+{
+  "git.defaultBranchName": "main",
+  "git.autofetch": true,
+  "plugins": {
+    "cloudflare": {
+      "enabled": true
+    },
+    "figma": {
+      "enabled": true
+    }
+  }
+}

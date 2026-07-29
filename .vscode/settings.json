@@ -1,0 +1,14 @@
+{
+    "git.defaultBranchName": "main",
+    "git.branchProtection": false,
+    "git.autofetch": true,
+    "git.confirmSync": false,
+    "scm.graph.showIncomingChanges": true,
+    "scm.graph.showOutgoingChanges": true,
+    "npm.packageManager": "pnpm",
+    "npm.exclude": [
+        "**/.next/**",
+        "**/.vercel/**",
+        "**/.wrangler/**"
+    ]
+}

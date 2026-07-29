@@ -1,0 +1,32 @@
+name: General feedback
+description: Share thoughts, praise, or questions about the project
+title: "[Feedback]: "
+labels: ["feedback"]
+body:
+  - type: markdown
+    attributes:
+      value: |
+        For quick feedback, the live form is usually best: **[bilauitmcuti.com/feedback](https://bilauitmcuti.com/feedback)**
+
+        Use this template for longer notes or anything you want on the public issue tracker.
+
+  - type: textarea
+    id: message
+    attributes:
+      label: Your feedback
+      placeholder: The semester countdown is really helpful when planning group assignments...
+    validations:
+      required: true
+
+  - type: dropdown
+    id: category
+    attributes:
+      label: Category
+      options:
+        - Praise / thanks
+        - Question
+        - UX / design
+        - Data / accuracy
+        - Other
+    validations:
+      required: true

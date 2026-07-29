@@ -1,0 +1,605 @@
+@import 'tailwindcss';
+@import 'tw-animate-css';
+@import "shadcn/tailwind.css";
+@import "./typeset.css";
+
+@source "../node_modules/streamdown/dist/*.js";
+
+/* Chat assistant markdown: text-sm (0.875rem) mobile, 0.9375rem from md+. Override
+   Typeset's mobile 1.125 size bump so body matches BubbleContent. */
+.typeset-chat {
+  --typeset-font-body: var(--font-geist-sans);
+  --typeset-font-heading: var(--font-geist-sans);
+  --typeset-font-mono: var(--font-geist-mono);
+  --typeset-size: 0.875rem;
+  --typeset-leading: 1.6;
+  --typeset-flow: 1em;
+  font-size: var(--typeset-size);
+}
+
+.typeset-article {
+  --typeset-font-body: var(--font-geist-sans);
+  --typeset-font-heading: var(--font-geist-sans);
+  --typeset-font-mono: var(--font-geist-mono);
+  --typeset-size: 0.875rem;
+  --typeset-leading: 1.6;
+  --typeset-flow: 1em;
+  font-size: var(--typeset-size);
+}
+
+@media (min-width: 768px) {
+  .typeset-article {
+    --typeset-size: 15px;
+  }
+}
+
+@media (min-width: 768px) {
+  .typeset-chat {
+    --typeset-size: 0.9375rem;
+  }
+}
+
+.typeset-chat :where(ul > li, ol > li) {
+  margin-block-start: 0.2em;
+}
+.typeset-chat :where(li > p, li > ul, li > ol) {
+  margin-block-start: 0.2em;
+}
+
+@custom-variant dark (&:is(.dark *));
+@custom-variant standalone (@media (display-mode: standalone));
+
+/* Disable page transition animations for instant navigation */
+html {
+  /* Prevent any fade/transition effects on page changes */
+  scroll-behavior: auto;
+}
+
+/* Disable theme transitions on html element - instant switching */
+html.dark,
+html.light {
+  transition: none !important;
+}
+
+/* Ensure theme class is applied immediately on html element */
+html {
+  color-scheme: light dark;
+}
+
+/* Base UI drawer: absolute overlay on iOS needs a positioned body after scroll */
+body {
+  position: relative;
+  /* Geist ss01: no-tail a site-wide (headings + body inherit) */
+  font-feature-settings: "ss01" 1;
+}
+
+/* Geist ss02: alt a — brand wordmarks only */
+.font-brand {
+  font-feature-settings: "ss02" 1;
+}
+
+/* Prevent flash of wrong theme during page load */
+/* CRITICAL: Don't set default background - let inline styles from script handle it */
+html {
+  /* No default background - script will set it based on localStorage */
+}
+
+html.light {
+  background-color: #ffffff !important;
+  color: #1a1a1a !important;
+}
+
+/* Mention picker & engagement prompt shells — match page white in light theme */
+.responsive-shell-bg {
+  background-color: #ffffff !important;
+}
+html.dark .responsive-shell-bg {
+  background-color: var(--popover) !important;
+}
+
+html.dark {
+  background-color: #1a1a1a !important;
+  color: #ffffff !important;
+}
+
+/* Disable transitions for main page containers - instant theme switching */
+body > div[class*="min-h-screen"] {
+  transition: none !important;
+}
+
+/* Disable transitions on navigation elements for instant switching */
+button[role="combobox"],
+button[type="button"][aria-label*="View"],
+button[type="button"][title*="View"],
+[data-slot="select-trigger"],
+[data-slot="select-content"] {
+  transition: none !important;
+}
+
+/* Set padding for select trigger */
+[data-slot="select-trigger"] {
+  padding-left: 12px !important;
+  padding-right: 12px !important;
+}
+
+/* Set padding for select items in dropdown */
+[data-slot="select-item"] {
+  padding-top: 4px !important;
+  padding-bottom: 4px !important;
+  padding-left: 12px !important;
+}
+
+/* Disable transitions for calendar controls and UI components for instant theme switching */
+.sticky.top-0,
+.sticky.top-0 > *,
+.sticky.top-0 > div,
+.sticky.top-0 > div > *,
+.sticky.top-0 button,
+.sticky.top-0 [data-slot="button"],
+.sticky.top-0 label,
+.sticky.top-0 div[class*="rounded-full"],
+.sticky.top-0 span[class*="transform"],
+[data-slot="select-trigger"],
+[data-slot="select-content"],
+[data-slot="popover-content"],
+[data-slot="popover-trigger"],
+[data-slot="popover-content"] > *,
+[data-slot="popover-content"] button,
+[data-slot="popover-content"] label,
+[data-slot="popover-content"] div[class*="rounded-full"],
+[data-slot="popover-content"] span[class*="transform"] {
+  transition: none !important;
+}
+
+/* Allowlist: toggle thumb must animate inside settings popover */
+[data-slot="popover-content"] .toggle-switch-thumb,
+.sticky.top-0 .toggle-switch-thumb {
+  transition: transform var(--motion-toggle) var(--ease-out) !important;
+}
+
+/* Re-enable transitions only for interactive hover states (opacity only, not colors) */
+.sticky.top-0 button:hover,
+[data-slot="select-trigger"]:hover,
+[data-slot="popover-trigger"]:hover {
+  transition-property: opacity !important;
+  transition-duration: 100ms !important;
+  transition-timing-function: ease-out !important;
+}
+
+/* Disable transitions for theme-aware elements - instant theme switching */
+/* Only allow transitions for hover states, not theme changes */
+*:not(.sticky.top-0):not(.sticky.top-0 *):not([data-slot="select-trigger"]):not([data-slot="select-content"]):not([data-slot="popover-content"]):not([data-slot="popover-content"] *):not([data-slot="drawer-popup"]):not([data-slot="drawer-overlay"]):not(:hover):not(button:hover):not(a:hover) {
+  transition-property: none !important;
+  transition-duration: 0ms !important;
+}
+
+/* Re-enable only specific transitions that are needed for UX (hover effects) */
+/* But disable background-color and color transitions - only allow opacity */
+button:hover,
+a:hover,
+[role="button"]:hover {
+  transition-property: opacity !important;
+  transition-duration: 100ms !important;
+  transition-timing-function: ease-out !important;
+}
+
+/*
+ * Motion allowlist (survives global transition kill-switch above):
+ * .toggle-switch-thumb, .chat-header, .nav-icon-btn:active,
+ * [data-slot="drawer-popup"|"drawer-overlay"] (rules after :root),
+ * overlay animate-in/out.
+ */
+:root {
+  --ease-out: cubic-bezier(0.23, 1, 0.32, 1);
+  --ease-drawer: cubic-bezier(0.32, 0.72, 0, 1);
+  --motion-toggle: 220ms;
+  --motion-press: 160ms;
+  --motion-header: 200ms;
+  --radius: 0.625rem;
+  --card: oklch(1 0 0);
+  --card-foreground: oklch(0.145 0 0);
+  --popover: oklch(1 0 0);
+  --popover-foreground: oklch(0.145 0 0);
+  --primary: oklch(0.205 0 0);
+  --primary-foreground: oklch(0.985 0 0);
+  --secondary: oklch(0.97 0 0);
+  --secondary-foreground: oklch(0.205 0 0);
+  --muted: oklch(0.97 0 0);
+  --muted-foreground: oklch(0.556 0 0);
+  --accent: oklch(0.97 0 0);
+  --accent-foreground: oklch(0.205 0 0);
+  --destructive: oklch(0.577 0.245 27.325);
+  --destructive-foreground: oklch(0.577 0.245 27.325);
+  --border: oklch(0.922 0 0);
+  --input: oklch(0.922 0 0);
+  --ring: oklch(0.708 0 0);
+  --chart-1: oklch(0.87 0 0);
+  --chart-2: oklch(0.556 0 0);
+  --chart-3: oklch(0.439 0 0);
+  --chart-4: oklch(0.371 0 0);
+  --chart-5: oklch(0.269 0 0);
+  --sidebar: oklch(0.985 0 0);
+  --sidebar-foreground: oklch(0.145 0 0);
+  --sidebar-primary: oklch(0.205 0 0);
+  --sidebar-primary-foreground: oklch(0.985 0 0);
+  --sidebar-accent: oklch(0.97 0 0);
+  --sidebar-accent-foreground: oklch(0.205 0 0);
+  --sidebar-border: oklch(0.922 0 0);
+  --sidebar-ring: oklch(0.708 0 0);
+  --background: oklch(1 0 0);
+  --foreground: oklch(0.145 0 0);
+}
+
+/* Drawer open/close slide + overlay fade (must beat transition kill-switch). */
+[data-slot="drawer-popup"] {
+  transition-property: transform, height, opacity, filter !important;
+  transition-duration: 500ms !important;
+  transition-timing-function: var(--ease-drawer) !important;
+}
+
+[data-slot="drawer-popup"][data-ending-style] {
+  transition-duration: 300ms !important;
+}
+
+[data-slot="drawer-popup"][data-swiping],
+[data-slot="drawer-popup"][data-nested-drawer-swiping] {
+  transition-duration: 0ms !important;
+}
+
+[data-slot="drawer-popup"][data-ending-style][data-swiping],
+[data-slot="drawer-popup"][data-ending-style][data-nested-drawer-swiping] {
+  transition-duration: calc(var(--drawer-swipe-strength, 1) * 350ms) !important;
+}
+
+/* Optimistic 40% snap until Base UI measures — open can slide up immediately with content visible. */
+[data-slot="drawer-popup"][data-snap-points]:not([data-snap-ready]):not([data-swiping]):not([data-ending-style]):not([data-starting-style]) {
+  --drawer-snap-point-offset: calc(0.6 * 100svh);
+}
+
+[data-slot="drawer-overlay"] {
+  transition-property: opacity !important;
+  transition-duration: 500ms !important;
+  transition-timing-function: var(--ease-drawer) !important;
+}
+
+[data-slot="drawer-overlay"][data-ending-style] {
+  transition-duration: 300ms !important;
+}
+
+[data-slot="drawer-overlay"][data-swiping] {
+  transition-duration: 0ms !important;
+}
+
+.dark {
+  --background: oklch(0.145 0 0);
+  --foreground: oklch(0.985 0 0);
+  --card: oklch(0.205 0 0);
+  --card-foreground: oklch(0.985 0 0);
+  --popover: oklch(0.205 0 0);
+  --popover-foreground: oklch(0.985 0 0);
+  --primary: oklch(0.922 0 0);
+  --primary-foreground: oklch(0.205 0 0);
+  --secondary: oklch(0.269 0 0);
+  --secondary-foreground: oklch(0.985 0 0);
+  --muted: oklch(0.269 0 0);
+  --muted-foreground: oklch(0.708 0 0);
+  --accent: oklch(0.269 0 0);
+  --accent-foreground: oklch(0.985 0 0);
+  --destructive: oklch(0.704 0.191 22.216);
+  --destructive-foreground: oklch(0.704 0.191 22.216);
+  --border: oklch(1 0 0 / 10%);
+  --input: oklch(1 0 0 / 15%);
+  --ring: oklch(0.556 0 0);
+  --chart-1: oklch(0.87 0 0);
+  --chart-2: oklch(0.556 0 0);
+  --chart-3: oklch(0.439 0 0);
+  --chart-4: oklch(0.371 0 0);
+  --chart-5: oklch(0.269 0 0);
+  --sidebar: oklch(0.205 0 0);
+  --sidebar-foreground: oklch(0.985 0 0);
+  --sidebar-primary: oklch(0.488 0.243 264.376);
+  --sidebar-primary-foreground: oklch(0.985 0 0);
+  --sidebar-accent: oklch(0.269 0 0);
+  --sidebar-accent-foreground: oklch(0.985 0 0);
+  --sidebar-border: oklch(1 0 0 / 10%);
+  --sidebar-ring: oklch(0.556 0 0);
+}
+
+@theme inline {
+  --font-sans: var(--font-geist-sans), ui-sans-serif, system-ui, sans-serif, "Apple Color Emoji",
+    "Segoe UI Emoji", "Segoe UI Symbol", "Noto Color Emoji";
+  --font-mono: var(--font-geist-mono), ui-monospace, monospace;
+  --color-background: var(--background);
+  --color-foreground: var(--foreground);
+  --color-card: var(--card);
+  --color-card-foreground: var(--card-foreground);
+  --color-popover: var(--popover);
+  --color-popover-foreground: var(--popover-foreground);
+  --color-primary: var(--primary);
+  --color-primary-foreground: var(--primary-foreground);
+  --color-secondary: var(--secondary);
+  --color-secondary-foreground: var(--secondary-foreground);
+  --color-muted: var(--muted);
+  --color-muted-foreground: var(--muted-foreground);
+  --color-accent: var(--accent);
+  --color-accent-foreground: var(--accent-foreground);
+  --color-destructive: var(--destructive);
+  --color-destructive-foreground: var(--destructive-foreground);
+  --color-border: var(--border);
+  --color-input: var(--input);
+  --color-ring: var(--ring);
+  --color-chart-1: var(--chart-1);
+  --color-chart-2: var(--chart-2);
+  --color-chart-3: var(--chart-3);
+  --color-chart-4: var(--chart-4);
+  --color-chart-5: var(--chart-5);
+  --radius-sm: calc(var(--radius) - 4px);
+  --radius-md: calc(var(--radius) - 2px);
+  --radius-lg: var(--radius);
+  --radius-xl: calc(var(--radius) + 4px);
+  --color-sidebar: var(--sidebar);
+  --color-sidebar-foreground: var(--sidebar-foreground);
+  --color-sidebar-primary: var(--sidebar-primary);
+  --color-sidebar-primary-foreground: var(--sidebar-primary-foreground);
+  --color-sidebar-accent: var(--sidebar-accent);
+  --color-sidebar-accent-foreground: var(--sidebar-accent-foreground);
+  --color-sidebar-border: var(--sidebar-border);
+  --color-sidebar-ring: var(--sidebar-ring);
+
+  /* Custom colors for Cuti UiTM */
+  --color-school-holiday: oklch(0.70 0.17 220);
+  --color-weekend: oklch(0.25 0.03 45);
+  --font-heading: var(--font-sans);
+  --radius-2xl: calc(var(--radius) * 1.8);
+  --radius-3xl: calc(var(--radius) * 2.2);
+  --radius-4xl: calc(var(--radius) * 2.6);
+}
+
+@layer base {
+  * {
+    @apply border-border outline-ring/50;
+  }
+  body {
+    @apply bg-background text-foreground;
+  }
+
+  /* Remove focus outline from calendar date cells permanently - COMPREHENSIVE FIX */
+  /* Remove ALL focus-related styles including ring, shadow, and outline */
+  .calendar-date-cell,
+  .calendar-date-cell:focus,
+  .calendar-date-cell:focus-visible,
+  .calendar-date-cell:focus-within,
+  .calendar-date-cell:active {
+    outline: none !important;
+    /* Remove focus ring and shadow completely */
+    --tw-ring-offset-shadow: 0 0 #0000 !important;
+    --tw-ring-shadow: 0 0 #0000 !important;
+    box-shadow: var(--tw-ring-offset-shadow, 0 0 #0000), var(--tw-ring-shadow, 0 0 #0000), var(--tw-shadow, 0 0 #0000) !important;
+    /* Remove tap highlight on mobile - critical for mobile devices */
+    -webkit-tap-highlight-color: transparent !important;
+    tap-highlight-color: transparent !important;
+    /* Prevent text selection which can cause focus */
+    user-select: none !important;
+    -webkit-user-select: none !important;
+    -moz-user-select: none !important;
+    -ms-user-select: none !important;
+  }
+
+  /* Remove focus outline from tooltip trigger wrapper */
+  [data-slot="tooltip-trigger"],
+  [data-slot="tooltip-trigger"]:focus,
+  [data-slot="tooltip-trigger"]:focus-visible,
+  [data-slot="tooltip-trigger"]:focus-within,
+  [data-slot="tooltip-trigger"]:active {
+    outline: none !important;
+    --tw-ring-offset-shadow: 0 0 #0000 !important;
+    --tw-ring-shadow: 0 0 #0000 !important;
+    box-shadow: var(--tw-ring-offset-shadow, 0 0 #0000), var(--tw-ring-shadow, 0 0 #0000), var(--tw-shadow, 0 0 #0000) !important;
+    -webkit-tap-highlight-color: transparent !important;
+    tap-highlight-color: transparent !important;
+  }
+
+  /* Override the global outline-ring/50 for calendar cells - only for focus */
+  .calendar-date-cell:focus,
+  .calendar-date-cell:focus-visible,
+  .calendar-date-cell:active {
+    outline: none !important;
+  }
+
+  /* Preserve current date border (1px) - border is not affected by focus ring removal */
+  /* Border will work normally for current date outline */
+  .calendar-date-cell.border {
+    /* Border is separate from focus ring, so it won't be affected */
+  }
+
+  /* Additional mobile-specific fixes */
+  @media (hover: none) and (pointer: coarse) {
+    /* Mobile devices */
+    .calendar-date-cell:focus,
+    .calendar-date-cell:focus-visible,
+    .calendar-date-cell:active,
+    .calendar-date-cell:focus-within {
+      outline: none !important;
+      box-shadow: none !important;
+      -webkit-tap-highlight-color: transparent !important;
+    }
+
+    [data-slot="tooltip-trigger"]:focus,
+    [data-slot="tooltip-trigger"]:focus-visible,
+    [data-slot="tooltip-trigger"]:active {
+      outline: none !important;
+      box-shadow: none !important;
+      -webkit-tap-highlight-color: transparent !important;
+    }
+
+    /* Mobile Safari sticky stability:
+       Avoid flicker/peek-through during very fast scrolling.
+       Keep sticky behavior; only adjust painting/compositing hints. */
+    .calendar-controls-sticky {
+      -webkit-backface-visibility: hidden;
+      backface-visibility: hidden;
+    }
+  }
+
+  /* Hover text color + press feedback on nav icon buttons - desktop only */
+  @media (hover: hover) and (pointer: fine) {
+    .nav-icon-btn:hover,
+    .nav-icon-btn:active {
+      color: var(--foreground) !important;
+    }
+    .nav-icon-btn:hover svg,
+    .nav-icon-btn:active svg {
+      color: var(--foreground) !important;
+    }
+    .nav-icon-btn:active {
+      transform: scale(0.97);
+      transition: transform var(--motion-press) var(--ease-out) !important;
+    }
+  }
+
+  /* Hide calendar header during scroll restore to prevent flash on mobile/PWA */
+  .calendar-header-restore-hide {
+    opacity: 0;
+    pointer-events: none;
+  }
+
+  /* Full-viewport overlay during scroll restore - below controls (z-40) so controls stay on top */
+  .calendar-scroll-restore-overlay {
+    position: fixed;
+    inset: 0;
+    z-index: 35;
+    background-color: var(--background);
+    pointer-events: none;
+  }
+
+  /*
+   * Sticky calendar controls: scroll-fade-b on the bg-background row with
+   * pb-6 -mb-6 so the mask fades painted pixels over the calendar below.
+   * Disable scroll(self) animation — the bar does not scroll; window does.
+   */
+  .calendar-controls-scroll-fade.scroll-fade-b {
+    animation: none;
+    --scroll-fade-b: var(--_scroll-fade-size-b);
+  }
+
+  /* Message scroller viewport: keyboard-scrollable region must not show focus ring */
+  [data-slot="message-scroller-viewport"],
+  [data-slot="message-scroller-viewport"]:focus,
+  [data-slot="message-scroller-viewport"]:focus-visible,
+  [data-slot="message-scroller-viewport"]:focus-within {
+    outline: none !important;
+    --tw-ring-offset-shadow: 0 0 #0000 !important;
+    --tw-ring-shadow: 0 0 #0000 !important;
+    box-shadow: var(--tw-ring-offset-shadow, 0 0 #0000), var(--tw-ring-shadow, 0 0 #0000), var(--tw-shadow, 0 0 #0000) !important;
+    -webkit-tap-highlight-color: transparent !important;
+    tap-highlight-color: transparent !important;
+  }
+
+  /* Top fade - used on about/download/feedback pages (chat uses scroll-fade on MessageScroller) */
+  .chat-top-fade {
+    height: 24px;
+    background: linear-gradient(to bottom, var(--background), transparent);
+  }
+
+  /*
+   * Drawer bottom inner padding under content/lists.
+   * Floor 1rem when safe-area is 0 (most Android browser chrome);
+   * uses home-indicator inset on iOS Safari / PWA (viewport-fit=cover).
+   */
+  .drawer-safe-area-bottom {
+    padding-bottom: max(1rem, env(safe-area-inset-bottom, 0px));
+  }
+
+  @media (display-mode: standalone) {
+    .drawer-safe-area-bottom {
+      padding-bottom: max(1.25rem, env(safe-area-inset-bottom, 0px));
+    }
+  }
+
+  /* Chat header scroll hide/show animation */
+  .chat-header {
+    transition: transform var(--motion-header) var(--ease-out) !important;
+  }
+
+  /* Chat auto-growing input - hide scrollbar, limit max height */
+  .chat-input {
+    max-height: 130px;
+    overflow-y: auto;
+    scrollbar-width: none;
+  }
+  .chat-input::-webkit-scrollbar {
+    display: none;
+  }
+  .chat-input::-webkit-resizer {
+    display: none;
+  }
+
+  /* Note: chat-input uses text-sm mobile, 0.9375rem from md+ */
+  /* iOS Safari may auto-zoom on focus since font-size < 16px */
+
+  /* Mobile: session submenus (Group A/B) — cap width + nudge left when wider than available space */
+  @media (max-width: 640px) {
+    [data-slot="dropdown-menu-positioner"]:has([data-slot="dropdown-menu-sub-content"]) {
+      max-width: calc(100vw - 16px);
+    }
+
+    [data-slot="dropdown-menu-sub-content"] {
+      min-width: 0;
+      box-sizing: border-box;
+      max-width: min(260px, calc(100vw - 24px));
+    }
+
+    [data-slot="dropdown-menu-sub-content"][data-side="right"] {
+      /* Match max-width cap so margin tracks the same width the positioner allows */
+      margin-left: min(
+        0px,
+        calc(
+          var(--available-width, 9999px) - min(260px, calc(100vw - 24px))
+        )
+      );
+    }
+  }
+  html {
+    @apply font-sans;
+  }
+}
+
+/* Toggle thumb slide — interruptible CSS transition, no overshoot */
+.toggle-switch-thumb {
+  transition: transform var(--motion-toggle) var(--ease-out) !important;
+}
+
+/* Keyboard-initiated theme toggle: instant snap (100+/day frequency) */
+html[data-keyboard-theme="1"] .toggle-switch-thumb {
+  transition: none !important;
+}
+
+/* Match Streamdown blurIn for chat reply action buttons after stream ends */
+@keyframes chat-blur-in {
+  from {
+    opacity: 0;
+    filter: blur(4px);
+  }
+  to {
+    opacity: 1;
+    filter: blur(0);
+  }
+}
+
+.chat-action-blur-in {
+  animation: chat-blur-in var(--chat-action-blur-duration, 150ms) ease-out both;
+}
+
+/* Reduced motion: keep opacity/color comprehension, drop transform movement */
+@media (prefers-reduced-motion: reduce) {
+  .toggle-switch-thumb,
+  .chat-header,
+  .nav-icon-btn:active {
+    transition: none !important;
+    transform: none !important;
+  }
+
+  .chat-action-blur-in {
+    animation: none !important;
+  }
+}

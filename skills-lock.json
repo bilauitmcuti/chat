@@ -1,0 +1,17 @@
+{
+  "version": 1,
+  "skills": {
+    "bilauitmcuti-api": {
+      "source": "bilauitmcuti/skills",
+      "sourceType": "github",
+      "skillPath": "skills/bilauitmcuti-api/SKILL.md",
+      "computedHash": "2226246b6cadbd6d8bec61deed4ac1d761b68c01c96b694c8e03d55a05751fde"
+    },
+    "shadcn": {
+      "source": "shadcn/ui",
+      "sourceType": "github",
+      "skillPath": "skills/shadcn/SKILL.md",
+      "computedHash": "4f78ff7cd3a4f637b6fe30dbbab4a80a19dd63fa62d9352bed461ccfdbcbbf43"
+    }
+  }
+}

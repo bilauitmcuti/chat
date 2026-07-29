@@ -1,0 +1,22 @@
+# Bila UiTM Cuti Chat
+
+Primary site: https://chat.bilauitmcuti.com
+Project type: UiTM academic calendar AI chat (Workers).
+
+## One-line summary
+AI assistant for UiTM academic calendar dates, lecture weeks, Malaysia public holidays, and general UiTM questions.
+
+## Stack
+- Next.js (App Router) + React + TypeScript
+- Cloudflare Workers (`@opennextjs/cloudflare`)
+- Cloudflare Workers AI + AI Gateway
+- Cloudflare Turnstile
+- pnpm
+
+## Data source
+https://api.bilauitmcuti.com (same-origin `/api/v1/meta`, `/api/v1/calendar`)
+
+## AI chat
+- Page: `/` (`/chat` redirects here)
+- API: `POST /chat/api` (SSE)
+- Feedback: `POST /chat/feedback/api`

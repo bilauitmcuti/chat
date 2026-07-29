@@ -1,0 +1,43 @@
+name: Feature request
+description: Suggest an improvement for students using the calendar
+title: "[Feature]: "
+labels: ["enhancement"]
+body:
+  - type: markdown
+    attributes:
+      value: |
+        Feature ideas are welcome. This project is **transparent but not fully open source** — the maintainer decides what ships.
+
+        Describe the **student problem** first; implementation details are optional.
+
+  - type: textarea
+    id: problem
+    attributes:
+      label: Problem
+      description: What pain point does this solve for UiTM students?
+      placeholder: It is hard to see which week of the semester we are in without opening a PDF...
+    validations:
+      required: true
+
+  - type: textarea
+    id: solution
+    attributes:
+      label: Proposed solution
+      description: What would you like to see? Keep it optional if you only have the problem in mind.
+    validations:
+      required: false
+
+  - type: textarea
+    id: alternatives
+    attributes:
+      label: Alternatives considered
+    validations:
+      required: false
+
+  - type: checkboxes
+    id: terms
+    attributes:
+      label: Acknowledgement
+      options:
+        - label: I understand feature requests may be closed, deferred, or implemented differently
+          required: true

@@ -1,0 +1,160 @@
+{
+  "source": "https://www.uitm.edu.my/",
+  "lastUpdated": "February 2026",
+  "about": {
+    "name": "Universiti Teknologi MARA (UiTM)",
+    "description": "Malaysia's largest public university",
+    "students": "approximately 176,843 students",
+    "programmes": "518 academic programmes from foundation to postgraduate level",
+    "vision": "To establish UiTM as a Globally Renowned University of Science, Technology, Humanities and Entrepreneurship",
+    "mission": "To lead the development of agile, professional bumiputeras through state-of-the-art curricula and impactful research",
+    "motto": "USAHA TAQWA MULIA (Endeavor, Piety, Excellence)",
+    "tagline": "Unleashing Potentials, Shaping the Future",
+    "coreValues": ["Excellence", "Synergy", "Integrity"],
+    "viceChancellor": "Professor Datuk Ts. Dr. Shahrin bin Sahib @ Sahibuddin"
+  },
+  "history": [
+    { "year": 1956, "event": "Started as RIDA Training Centre in Petaling Jaya, inspired by Dato' Onn Ja'afar" },
+    { "year": "14 Feb 1957", "event": "Officially opened by Trade & Industry Minister Ismail Abdul Rahman" },
+    { "year": 1965, "event": "Renamed Maktab MARA (MARA College) under Majlis Amanah Rakyat" },
+    { "year": "14 Oct 1967", "event": "Renamed Institut Teknologi MARA (ITM) by Tun Abdul Razak" },
+    { "year": 1976, "event": "ITM Act enacted, rapid expansion began with Shah Alam 300-acre campus" },
+    { "year": 1999, "event": "Upgraded to full university status as Universiti Teknologi MARA (UiTM)" },
+    { "note": "UiTM is a Bumiputera institution dedicated to empowering indigenous communities" }
+  ],
+  "campuses": {
+    "main": "UiTM Shah Alam, Selangor (headquarters)",
+    "network": "1 main campus, 12 state campuses (7 autonomous), satellite campuses, and 21 affiliated colleges",
+    "total": "34 campuses across all 13 states",
+    "byState": {
+      "Perlis": "UiTM Perlis (Arau)",
+      "Kedah": "UiTM Kedah (Sungai Petani)",
+      "Pulau Pinang": "UiTM Pulau Pinang (Permatang Pauh, Bertam)",
+      "Perak": "UiTM Perak (Seri Iskandar, Tapah)",
+      "Selangor": "UiTM Shah Alam (Main), Puncak Alam, Puncak Perdana, Dengkil, Hospital Sungai Buloh",
+      "Negeri Sembilan": "UiTM Negeri Sembilan (Kuala Pilah, Seremban, Rembau)",
+      "Melaka": "UiTM Melaka (Alor Gajah, Bandaraya Melaka, Jasin)",
+      "Johor": "UiTM Johor (Segamat, Pasir Gudang)",
+      "Pahang": "UiTM Pahang (Jengka, Raub)",
+      "Terengganu": "UiTM Terengganu (Dungun, Kuala Terengganu, Bukit Besi)",
+      "Kelantan": "UiTM Kelantan (Machang, Kota Bharu)",
+      "Sabah": "UiTM Sabah (Kota Kinabalu, Tawau)",
+      "Sarawak": "UiTM Sarawak (Samarahan, Samarahan 2, Mukah)"
+    },
+    "kktNote": "Kedah, Kelantan, and Terengganu (KKT states) have weekends on Friday-Saturday instead of Saturday-Sunday"
+  },
+  "faculties": {
+    "scienceTechnology": [
+      "Faculty of Applied Sciences",
+      "Faculty of Built Environment",
+      "Faculty of Electrical Engineering",
+      "Faculty of Civil Engineering",
+      "Faculty of Mechanical Engineering",
+      "Faculty of Chemical Engineering",
+      "Faculty of Plantation and Agrotechnology",
+      "Faculty of Sports Science and Recreation",
+      "Faculty of Medicine",
+      "Faculty of Pharmacy",
+      "Faculty of Dentistry",
+      "Faculty of Health Sciences",
+      "Faculty of Computer and Mathematical Sciences"
+    ],
+    "socialScienceHumanities": [
+      "Faculty of Art and Design",
+      "Faculty of Education",
+      "Faculty of Music",
+      "Faculty of Law",
+      "Faculty of Communication and Media Studies",
+      "Faculty of Film, Theatre and Animation",
+      "Faculty of Information Science",
+      "Faculty of Administrative Science and Policy Studies"
+    ],
+    "businessManagement": [
+      "Faculty of Accountancy",
+      "Faculty of Business and Management",
+      "Faculty of Hotel and Tourism Management"
+    ],
+    "academicCentres": [
+      "Academy of Language Studies",
+      "Academy of Contemporary Islamic Studies",
+      "Arshad Ayub Graduate Business School",
+      "Centre of Foundation Studies",
+      "Institute of Continuing Education and Professional Studies",
+      "Institute of Graduate Studies (IPSis)",
+      "UiTM-PDRM Police Academy"
+    ]
+  },
+  "programmes": {
+    "levels": [
+      { "name": "Foundation / Asasi", "duration": "1 year" },
+      { "name": "Pre-Diploma" },
+      { "name": "Diploma", "duration": "2-3 years" },
+      { "name": "Bachelor's Degree / Degree / Ijazah Sarjana Muda", "duration": "3-4 years", "note": "Degree and Ijazah both refer to Bachelor's Degree in UiTM" },
+      { "name": "Master's / Sarjana", "duration": "1-2 years" },
+      { "name": "PhD / Doctorate / Doktor Falsafah", "duration": "3-5 years" },
+      { "name": "Professional programmes" },
+      { "name": "Part-time & distance learning", "details": "e-PJJ (e-Pembelajaran Jarak Jauh), PLK (Pembelajaran Luar Kampus)" }
+    ]
+  },
+  "admission": {
+    "channels": [
+      "UPU (Unit Pengambilan Universiti) under Ministry of Higher Education",
+      "UiTM Online: online.uitm.edu.my",
+      "ICEPS Portal: apply-iceps.uitm.edu.my"
+    ],
+    "entryQualifications": "SPM, STPM, Matriculation, Asasi/Foundation, Diploma, equivalent certificates",
+    "note": "Each programme has specific entry requirements - check hea.uitm.edu.my for details"
+  },
+  "examGrades": {
+    "passing": {
+      "grades": ["A+", "A", "A-", "B+", "B", "B-", "C+", "C"],
+      "status": "Lulus (LU)"
+    },
+    "failing": {
+      "grades": ["C-", "D+", "D", "E", "F", "GC", "GF"],
+      "status": "Gagal (GA)"
+    }
+  },
+  "studentFees": {
+    "title": "Senarai Yuran Pengajian UITM",
+    "tuition": {
+      "semester1": { "diploma": "RM748", "degree": "RM798" },
+      "semester2AndAbove": { "diploma": "RM540", "degree": "RM590" }
+    },
+    "collegePerSemester": {
+      "double": "RM420",
+      "triple": "RM315",
+      "quad": "RM210",
+      "labels": {
+        "double": "Bilik Berdua",
+        "triple": "Bilik Bertiga",
+        "quad": "Bilik Berempat"
+      }
+    },
+    "electricalPerItemPerSemester": "RM10",
+    "electricalNote": "Yuran Barang Elektrik per barang untuk satu semester",
+    "disclaimer": "Harga mungkin berkurang atau lebih tertakluk pada status pelajar anda atau pihak kampus anda."
+  },
+  "portals": {
+    "officialWebsite": "uitm.edu.my",
+    "iStudentPortal": "simsweb.uitm.edu.my or istudent.uitm.edu.my",
+    "uitmoneCard": "Student ID + payment + access card",
+    "sufo": "Student Feedback Online (mandatory course evaluation)",
+    "mds": "Minggu Destini Siswa (orientation week for new students)"
+  },
+  "contact": {
+    "address": "40450 Shah Alam, Selangor Darul Ehsan, Malaysia",
+    "phone": "+603-5544 2000",
+    "hours": "Monday - Friday, 8:00 AM - 5:00 PM",
+    "website": "uitm.edu.my",
+    "contactPage": "uitm.edu.my/en/discover-uitm/contact-us"
+  },
+  "links": {
+    "official": "https://www.uitm.edu.my/",
+    "academicAffairs": "https://hea.uitm.edu.my/",
+    "programmeSearch": "https://online.uitm.edu.my/program_tawar.cfm",
+    "applicationPortal": "https://apply-iceps.uitm.edu.my/",
+    "iStudentPortal": "https://simsweb.uitm.edu.my/",
+    "uitmFacts": "https://www.uitm.edu.my/en/discover-uitm/uitm-facts"
+  }
+}

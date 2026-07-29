@@ -1,0 +1,21 @@
+{
+  "$schema": "node_modules/wrangler/config-schema.json",
+  "name": "bilauitmcuti-chat",
+  "main": ".open-next/worker.js",
+  "compatibility_date": "2025-11-01",
+  "compatibility_flags": ["nodejs_compat"],
+  "assets": {
+    "directory": ".open-next/assets",
+    "binding": "ASSETS"
+  },
+  "ai": {
+    "binding": "AI",
+    "remote": true
+  },
+  "vars": {
+    "AI_GATEWAY_ID": "bilauitmcuti-chat"
+  },
+  "observability": {
+    "enabled": true
+  }
+}

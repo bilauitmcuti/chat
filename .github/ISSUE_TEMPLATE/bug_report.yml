@@ -1,0 +1,76 @@
+name: Bug report
+description: Something is broken on the site or in the app
+title: "[Bug]: "
+labels: ["bug"]
+body:
+  - type: markdown
+    attributes:
+      value: |
+        Thanks for reporting. This repo is maintained transparently by [shahrulestar](https://github.com/shahrulestar) — not as a full community open source project, but issues help fix real problems for students.
+
+        Please check [bilauitmcuti.com](https://bilauitmcuti.com) on the latest version before filing.
+
+  - type: textarea
+    id: description
+    attributes:
+      label: What went wrong?
+      description: Clear description of the bug.
+      placeholder: The chat panel does not scroll on mobile after sending a message...
+    validations:
+      required: true
+
+  - type: textarea
+    id: steps
+    attributes:
+      label: Steps to reproduce
+      description: How can we see the same behavior?
+      placeholder: |
+        1. Open bilauitmcuti.com on Android Chrome
+        2. Open chat
+        3. Send a message
+        4. See error
+    validations:
+      required: true
+
+  - type: textarea
+    id: expected
+    attributes:
+      label: Expected behavior
+    validations:
+      required: true
+
+  - type: textarea
+    id: actual
+    attributes:
+      label: Actual behavior
+    validations:
+      required: true
+
+  - type: dropdown
+    id: area
+    attributes:
+      label: Area
+      options:
+        - Calendar / dates
+        - Chat assistant
+        - UI / layout
+        - Performance
+        - Other
+    validations:
+      required: true
+
+  - type: input
+    id: browser
+    attributes:
+      label: Browser / device
+      placeholder: Chrome 131 on Windows 11 / Safari on iPhone 15
+    validations:
+      required: false
+
+  - type: checkboxes
+    id: terms
+    attributes:
+      label: Acknowledgement
+      options:
+        - label: I understand this is a maintainer-led project and fixes depend on available time
+          required: true

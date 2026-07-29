@@ -1,0 +1,8 @@
+blank_issues_enabled: false
+contact_links:
+  - name: In-app feedback
+    url: https://bilauitmcuti.com/feedback
+    about: Send general feedback through the live site (often faster than GitHub)
+  - name: GitHub Sponsors
+    url: https://github.com/sponsors/shahrulestar
+    about: Support maintenance of Bila UiTM Cuti

@@ -1,0 +1,41 @@
+---
+description: Cloudflare Workers deploy via @opennextjs/cloudflare (OpenNext)
+globs: wrangler.jsonc,open-next.config.ts,next.config.mjs,package.json,.github/workflows/**
+alwaysApply: false
+---
+
+# Cloudflare Workers (`@opennextjs/cloudflare`)
+
+This project deploys with **OpenNext on Cloudflare Workers**, not Pages / next-on-pages.
+
+## Deploy
+
+| Setting | Value |
+|---------|--------|
+| Build | `pnpm run build:worker` or `opennextjs-cloudflare build` |
+| Output | `.open-next/` (`main`: `.open-next/worker.js`, assets: `.open-next/assets`) |
+| Worker name | `bilauitmcuti-chat` |
+| Domain | `chat.bilauitmcuti.com` |
+| Compatibility | `nodejs_compat` |
+
+Scripts: `pnpm preview`, `pnpm deploy`.
+
+## Bindings
+
+- Workers AI: `ai.binding: "AI"` in `wrangler.jsonc`
+- AI Gateway: `vars.AI_GATEWAY_ID` (not a separate binding) — third arg to `env.AI.run()`
+- Env access: `getCloudflareContext()` from `@opennextjs/cloudflare` (not `getOptionalRequestContext`)
+
+## Do not
+
+- Reintroduce `@cloudflare/next-on-pages` or `pages_build_output_dir` without an explicit migration back to Pages.
+- Set `package.json` `"build"` to the OpenNext CLI (use `"build": "next build"` and `build:worker` for CF).
+- Add a zone route `bilauitmcuti.com/_next/*` that steals apex calendar assets.
+
+## Local verify
+
+```bash
+pnpm preview
+# or
+pnpm dev   # after wrangler login; OpenNext initOpenNextCloudflareForDev
+```

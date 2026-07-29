@@ -17,7 +17,7 @@ export type ReasoningLlmPhase = "pre_answer" | "post_answer";
 export interface GenerateReasoningLlmInput extends ReasoningStatusInput {
   phase: ReasoningLlmPhase;
   finalAnswer?: string;
-  requestHost?: string | null;
+  modelId?: string | null;
   correlationId?: string;
   /** Override for tests. */
   askAi?: typeof askWorkersAi;
@@ -175,7 +175,7 @@ export async function generateReasoningStatusLlm(
       askAi(userPrompt, systemPrompt, undefined, {
         maxTokens: REASONING_LLM_MAX_TOKENS,
         temperature: REASONING_LLM_TEMPERATURE,
-        requestHost: input.requestHost,
+        modelId: input.modelId,
         correlationId: input.correlationId,
       }),
       timeoutMs

@@ -47,7 +47,14 @@ import {
   type MentionMatch,
 } from "@/components/chat/chat-utils";
 import { captureThinkingMetadata } from "@/lib/chat/reasoning-gate";
-import { hostSupportsReasoningUi } from "@/lib/workers-ai-model-tier";
+import {
+  DEFAULT_CHAT_MODEL,
+  getChatModel,
+  getVisibleChatModels,
+  readStoredChatModel,
+  supportsReasoningUi,
+  writeStoredChatModel,
+} from "@/lib/chat/models";
 import { CHAT_STREAM_PHASE } from "@/lib/chat/stream-phase";
 import {
   getInitialChatSessions,
@@ -103,6 +110,13 @@ export default function ChatPage() {
     All: getInitialChatSessions("All"),
   }));
   const [dropdownOpen, setDropdownOpen] = useState(false);
+  const [modelDropdownOpen, setModelDropdownOpen] = useState(false);
+  const [selectedModelId, setSelectedModelId] = useState<string>(DEFAULT_CHAT_MODEL);
+  const [chatModels, setChatModels] = useState(() =>
+    typeof window !== "undefined"
+      ? getVisibleChatModels(window.location.hostname)
+      : getVisibleChatModels("chat.bilauitmcuti.com")
+  );
   const [activeSubmenu, setActiveSubmenu] = useState<string | null>(null);
   const keepDropdownOpenRef = useRef(false);
   const selectionRef = useRef({
@@ -148,6 +162,22 @@ export default function ChatPage() {
       .some((item) => item.trim().startsWith(`${CHAT_TURNSTILE_COOKIE}=1`));
     if (hasVerifiedCookie) setIsTurnstileSessionVerified(true);
   }, []);
+
+  useEffect(() => {
+    const host = window.location.hostname;
+    setChatModels(getVisibleChatModels(host));
+    const stored = readStoredChatModel(host);
+    if (stored) setSelectedModelId(stored);
+    else setSelectedModelId(DEFAULT_CHAT_MODEL);
+  }, []);
+
+  const handleModelSelect = useCallback((modelId: string) => {
+    setSelectedModelId(modelId);
+    writeStoredChatModel(modelId);
+    setModelDropdownOpen(false);
+  }, []);
+
+  const selectedModelLabel = getChatModel(selectedModelId)?.name ?? "Gemma 4";
 
   const hydrateChatFromHomepageSources = useCallback(() => {
     const hydration = resolveHomepageChatHydration();
@@ -405,6 +435,9 @@ export default function ChatPage() {
       return;
     }
 
+    // Snapshot for this turn — picker changes during streaming apply to the next send only.
+    const modelIdForTurn = selectedModelId;
+
     const now = Date.now();
     const assistantId = (now + 1).toString();
     const userMessage: Message = {
@@ -421,9 +454,7 @@ export default function ChatPage() {
       isComplete: false,
       timestamp: now,
       userPrompt: trimmed,
-      reasoningUiSupported: hostSupportsReasoningUi(
-        typeof window !== "undefined" ? window.location.hostname : undefined
-      ),
+      reasoningUiSupported: supportsReasoningUi(modelIdForTurn),
     };
 
     setMessages([...messages, userMessage, assistantPlaceholder]);
@@ -463,6 +494,7 @@ export default function ChatPage() {
         selectedSessions,
         history,
         stream: true,
+        model: modelIdForTurn,
         turnstileToken: trimmedToken ? trimmedToken : undefined,
       });
       let content: string | null = null;
@@ -787,6 +819,7 @@ export default function ChatPage() {
     requiresTurnstile,
     selectedProgram,
     selectedSessions,
+    selectedModelId,
     startLoadingState,
     turnstileToken,
     waitForTurnstileConfig,
@@ -1058,6 +1091,12 @@ export default function ChatPage() {
           onSessionToggle={handleSessionToggle}
           onProgramSelect={handleProgramSelect}
           formatGroupASessionTriggerLabel={formatGroupASessionTriggerLabel}
+          chatModels={chatModels}
+          selectedModelId={selectedModelId}
+          selectedModelLabel={selectedModelLabel}
+          modelDropdownOpen={modelDropdownOpen}
+          onModelDropdownOpenChange={setModelDropdownOpen}
+          onModelSelect={handleModelSelect}
         />
       </div>
     </div>

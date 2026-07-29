@@ -86,7 +86,7 @@ export function mapChatError(error: unknown): { message: string; status: number 
   ) {
     return {
       message:
-        "AI Gateway is not configured. Create gateway bilauitmcuti-chat in Cloudflare dashboard (AI → AI Gateway), or set SKIP_AI_GATEWAY=1 for local dev.",
+        "AI Gateway is not configured. Create gateway buc-chat in Cloudflare dashboard (AI → AI Gateway), or set SKIP_AI_GATEWAY=1 for local dev.",
       status: 502,
     };
   }

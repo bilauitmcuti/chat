@@ -18,7 +18,21 @@ This project deploys with **OpenNext on Cloudflare Workers**, not Pages / next-o
 | Domain | `chat.bilauitmcuti.com` |
 | Compatibility | `nodejs_compat` |
 
-Scripts: `pnpm preview`, `pnpm deploy`.
+Scripts: `pnpm preview`, `pnpm deploy`, `pnpm upload` (preview versions).
+
+## Workers Builds (Git) — dashboard must match
+
+Worker → **Settings → Build**:
+
+| Setting | Value |
+|---------|--------|
+| Build command | `pnpm run build:worker` |
+| Deploy command | `npx wrangler deploy` |
+| Non-production deploy | `npx wrangler versions upload` or `pnpm run upload` |
+
+Never use `pnpm run build` (`next build` only) as the Workers Builds build command — it skips OpenNext and causes:
+
+`Could not find compiled Open Next config, did you run the build command?`
 
 ## Bindings
 

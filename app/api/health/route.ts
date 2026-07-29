@@ -1,22 +1,15 @@
-export const runtime = 'edge';
 export const dynamic = "force-dynamic";
 
-export async function GET(request: Request) {
+export async function GET() {
   const { checkEnv } = await import("@/lib/env");
-  const {
-    resolveProductionChatModelChain,
-    resolveWorkersAiModelTier,
-  } = await import("@/lib/ai");
+  const { getDefaultChatModel, CHAT_MODELS } = await import("@/lib/chat/models");
   const { ai } = await checkEnv();
-  const host = request.headers.get("host");
-  const tier = resolveWorkersAiModelTier(host);
-  const models = resolveProductionChatModelChain(host);
   const checks: Record<string, string | string[]> = {
     status: "ok",
     timestamp: new Date().toISOString(),
     ai,
-    modelTier: tier,
-    models,
+    model: getDefaultChatModel(),
+    models: CHAT_MODELS.map((m) => m.id),
   };
 
   const healthy = ai !== "missing";

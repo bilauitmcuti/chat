@@ -1,6 +1,6 @@
 {
   "$schema": "node_modules/wrangler/config-schema.json",
-  "name": "bilauitmcuti-chat",
+  "name": "chat",
   "main": ".open-next/worker.js",
   "compatibility_date": "2025-11-01",
   "compatibility_flags": ["nodejs_compat"],
@@ -13,8 +13,11 @@
     "remote": true
   },
   "vars": {
-    "AI_GATEWAY_ID": "bilauitmcuti-chat"
+    "AI_GATEWAY_ID": "buc-chat"
   },
+  "routes": [
+    { "pattern": "chat.bilauitmcuti.com", "custom_domain": true }
+  ],
   "observability": {
     "enabled": true
   }

@@ -103,62 +103,6 @@ export async function sendDiscordWebhook(params: {
   await assertDiscordResponseOk(response);
 }
 
-export function buildContactNotificationEmbed(params: {
-  who: string;
-  category: string;
-  message: string;
-  rating: number;
-  email?: string;
-  time: string;
-}): DiscordEmbed {
-  const trimmedEmail = params.email?.trim() ?? "";
-  const fields: DiscordEmbedField[] = [
-    { name: "Who", value: params.who, inline: true },
-    { name: "Category", value: params.category, inline: true },
-    { name: "Rating", value: `${params.rating} out of 5 stars`, inline: true },
-    { name: "Time", value: params.time, inline: false },
-  ];
-  if (trimmedEmail.length > 0) {
-    fields.push({ name: "Email", value: trimmedEmail, inline: false });
-  }
-
-  return {
-    title: "User Feedback",
-    color: 0x5865f2,
-    fields,
-    description: params.message,
-  };
-}
-
-const ENGAGEMENT_REASON_MAX_CHARS = 1024;
-
-function excerptEngagementReason(text: string): string {
-  const trimmed = text.trim();
-  if (!trimmed) return "(empty)";
-  if (trimmed.length <= ENGAGEMENT_REASON_MAX_CHARS) return trimmed;
-  return trimmed.slice(0, ENGAGEMENT_REASON_MAX_CHARS - 3) + "...";
-}
-
-export function buildEngagementNotificationEmbed(params: {
-  rating: number;
-  time: string;
-  reason?: string;
-}): DiscordEmbed {
-  const fields: DiscordEmbed["fields"] = [
-    { name: "Rating", value: `${params.rating} out of 5 stars`, inline: true },
-    { name: "Time", value: params.time, inline: true },
-  ];
-  const reason = params.reason?.trim();
-  if (reason) {
-    fields.push({ name: "Reason", value: excerptEngagementReason(reason), inline: false });
-  }
-  return {
-    title: "User Star Rating",
-    color: 0xfee75c,
-    fields,
-  };
-}
-
 const CHAT_FEEDBACK_EXCERPT_CHARS = 800;
 
 function excerptForDiscord(text: string, max = CHAT_FEEDBACK_EXCERPT_CHARS): string {

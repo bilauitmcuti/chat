@@ -1,5 +1,5 @@
 /** Default gateway name — create in Cloudflare dashboard (AI → AI Gateway). */
-export const DEFAULT_AI_GATEWAY_ID = "bilauitmcuti-chat";
+export const DEFAULT_AI_GATEWAY_ID = "buc-chat";
 
 export interface AiGatewayRunOptions {
   skipCache?: boolean;

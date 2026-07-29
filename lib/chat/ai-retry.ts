@@ -117,7 +117,7 @@ export async function askAiWithRetry(
   options: {
     maxTokens: number;
     temperature: number;
-    requestHost?: string | null;
+    modelId?: string | null;
     correlationId?: string;
   }
 ): Promise<string> {
@@ -142,7 +142,7 @@ export async function streamAiWithRetry(
   options: {
     maxTokens: number;
     temperature: number;
-    requestHost?: string | null;
+    modelId?: string | null;
     correlationId?: string;
     onToken: (token: string) => void | Promise<void>;
     onReasoningToken?: (token: string) => void | Promise<void>;
@@ -156,7 +156,7 @@ export async function streamAiWithRetry(
       return await streamWorkersAi(message, systemPrompt, history, {
         maxTokens: options.maxTokens,
         temperature: options.temperature,
-        requestHost: options.requestHost,
+        modelId: options.modelId,
         correlationId: options.correlationId,
         onToken: options.onToken,
         onReasoningToken: options.onReasoningToken,

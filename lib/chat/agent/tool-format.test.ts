@@ -3,7 +3,7 @@ import {
   formatToolsForModel,
   usesOpenAiFunctionToolFormat,
 } from "@/lib/chat/agent/tool-format";
-import { MODEL_WORKERS_AI_PRODUCTION } from "@/lib/ai";
+import { CHAT_MODEL_GEMMA_4 } from "@/lib/chat/models";
 
 const MODEL_GEMINI_PARTNER = "google/gemini-3.1-flash-lite";
 
@@ -21,8 +21,8 @@ const sampleTool = {
 
 describe("formatToolsForModel", () => {
   it("wraps tools in OpenAI function shape for Gemma 4", () => {
-    expect(usesOpenAiFunctionToolFormat(MODEL_WORKERS_AI_PRODUCTION)).toBe(true);
-    const formatted = formatToolsForModel(MODEL_WORKERS_AI_PRODUCTION, [sampleTool]);
+    expect(usesOpenAiFunctionToolFormat(CHAT_MODEL_GEMMA_4)).toBe(true);
+    const formatted = formatToolsForModel(CHAT_MODEL_GEMMA_4, [sampleTool]);
     expect(formatted[0]).toEqual({
       type: "function",
       function: {

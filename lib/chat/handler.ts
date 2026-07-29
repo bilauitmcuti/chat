@@ -1,9 +1,8 @@
 import { NextRequest, NextResponse } from "next/server";
 import {
   getAiBinding,
-  getMaxOutputTokensForHost,
-  resolveProductionChatModelChain,
-  resolveWorkersAiModelTier,
+  getMaxOutputTokens,
+  resolveChatModel,
   shouldStreamTokensToClient,
   type ChatMessage,
 } from "@/lib/ai";
@@ -52,7 +51,7 @@ import {
   isComplexReasoningTurn,
 } from "@/lib/chat/reasoning-gate";
 import {
-  agentModeForModelChain,
+  agentModeForModelId,
   buildAgentTurnContext,
   buildCompactFallbackSystemPrompt,
   isChatAgentEnabled,
@@ -231,6 +230,7 @@ export async function POST(request: NextRequest) {
     });
     return response;
   };
+  let chatModelId: string | undefined;
   try {
     const contentType = request.headers.get("content-type");
     if (!contentType?.includes("application/json")) {
@@ -251,7 +251,8 @@ export async function POST(request: NextRequest) {
       return jsonError("Request body too large", 413);
     }
 
-    const parseResult = parseChatRequest(rawBody);
+    const requestHostname = request.headers.get("host") ?? "";
+    const parseResult = parseChatRequest(rawBody, requestHostname);
     if (!parseResult.success) {
       return jsonError(parseResult.error, 400);
     }
@@ -262,6 +263,7 @@ export async function POST(request: NextRequest) {
       selectedSessions: rawSelectedSessions,
       history,
       turnstileToken,
+      model: requestedModel,
       stream: wantStream,
     } = parseResult.data;
     const isTurnstileRequired = isTurnstileVerificationRequired();
@@ -272,11 +274,10 @@ export async function POST(request: NextRequest) {
       if (!turnstileToken?.trim()) {
         return jsonError("Please complete verification first.", 403);
       }
-      const hostname = request.headers.get("host") ?? "";
       const turnstileResult = await verifyTurnstileToken({
         token: turnstileToken,
         expectedAction: "chat_message",
-        expectedHostname: getTurnstileExpectedHostname(hostname),
+        expectedHostname: getTurnstileExpectedHostname(requestHostname),
         remoteip: getClientIpForTurnstile(request),
       });
       if (!turnstileResult.success) {
@@ -285,7 +286,7 @@ export async function POST(request: NextRequest) {
       shouldSetVerifiedCookie = true;
     }
 
-    const requestHost = request.headers.get("host");
+    chatModelId = resolveChatModel(requestedModel, requestHostname);
     const origin = new URL(request.url).origin;
 
     type StreamHooks = {
@@ -300,6 +301,7 @@ export async function POST(request: NextRequest) {
     };
 
     const executeChatTurn = async (streamHooks?: StreamHooks): Promise<string> => {
+    const modelId = chatModelId!;
     const turnStartMs = Date.now();
     const meta = await loadMetaIntoStore();
     const { validSessionIds, validPrograms } = validSetsFromMeta(meta);
@@ -380,8 +382,7 @@ export async function POST(request: NextRequest) {
     );
 
     const useAgentPath = isChatAgentEnabled();
-    const modelChain = resolveProductionChatModelChain(requestHost);
-    const agentMode = useAgentPath ? agentModeForModelChain(modelChain) : "compact";
+    const agentMode = useAgentPath ? agentModeForModelId(modelId) : "compact";
     const isAgentToolsPath = useAgentPath && agentMode === "tools";
 
     const multipleSessionsSelected = effectiveSessions.length > 1;
@@ -429,6 +430,7 @@ export async function POST(request: NextRequest) {
     };
 
     const cacheKey = [
+      modelId,
       useAgentPath ? `agent:${agentMode}` : "legacy",
       executionMode,
       isComplexTurn ? "complex" : "simple",
@@ -619,8 +621,7 @@ export async function POST(request: NextRequest) {
       }
     }
 
-    const modelTier = resolveWorkersAiModelTier(requestHost);
-    const maxOutputTokens = getMaxOutputTokensForHost(requestHost);
+    const maxOutputTokens = getMaxOutputTokens();
     const modelBudget = getModelResponseBudget(
       sanitizedMessage,
       !useResearchOnly,
@@ -722,7 +723,7 @@ export async function POST(request: NextRequest) {
       addDatesFromContextText(allowedDates, primaryContext);
     }
 
-    const streamTokensToClient = shouldStreamTokensToClient(requestHost);
+    const streamTokensToClient = shouldStreamTokensToClient();
 
     const runPromptRetry = async (
       promptSuffix: string,
@@ -735,14 +736,14 @@ export async function POST(request: NextRequest) {
           sanitizedMessage,
           prompt,
           sanitizedHistory,
-          { ...budget, requestHost, correlationId, onToken, emitTokensToClient: streamTokensToClient }
+          { ...budget, modelId: modelId, correlationId, onToken, emitTokensToClient: streamTokensToClient }
         );
       }
       return askAiWithRetry(
         sanitizedMessage,
         prompt,
         sanitizedHistory,
-        { ...budget, requestHost, correlationId }
+        { ...budget, modelId: modelId, correlationId }
       );
     };
 
@@ -756,14 +757,14 @@ export async function POST(request: NextRequest) {
           sanitizedMessage,
           prompt,
           sanitizedHistory,
-          { ...budget, requestHost, correlationId, onToken, emitTokensToClient: streamTokensToClient }
+          { ...budget, modelId: modelId, correlationId, onToken, emitTokensToClient: streamTokensToClient }
         );
       }
       return askAiWithRetry(
         sanitizedMessage,
         prompt,
         sanitizedHistory,
-        { ...budget, requestHost, correlationId }
+        { ...budget, modelId: modelId, correlationId }
       );
     };
 
@@ -801,7 +802,7 @@ export async function POST(request: NextRequest) {
           userMessage: sanitizedMessage,
           history: sanitizedHistory,
           ctx: agentTurnContext,
-          requestHost,
+          modelId: modelId,
           correlationId,
           maxTokens: modelBudget.maxTokens,
           temperature: modelBudget.temperature,
@@ -832,7 +833,7 @@ export async function POST(request: NextRequest) {
           sanitizedHistory,
           {
             ...modelBudget,
-            requestHost,
+            modelId: modelId,
             correlationId,
             onToken,
             onReasoningToken: onProgress?.onReasoningToken,
@@ -844,7 +845,7 @@ export async function POST(request: NextRequest) {
           sanitizedMessage,
           systemPromptWithCompletion,
           sanitizedHistory,
-          { ...modelBudget, requestHost, correlationId }
+          { ...modelBudget, modelId: modelId, correlationId }
         );
       }
 
@@ -864,14 +865,14 @@ export async function POST(request: NextRequest) {
             sanitizedMessage,
             systemPromptWithCompletion + DATE_VALIDATION_RETRY_NUDGE,
             sanitizedHistory,
-            { ...modelBudget, requestHost, correlationId, onToken, emitTokensToClient: streamTokensToClient }
+            { ...modelBudget, modelId: modelId, correlationId, onToken, emitTokensToClient: streamTokensToClient }
           );
         } else {
           rawReply = await askAiWithRetry(
             sanitizedMessage,
             systemPromptWithCompletion + DATE_VALIDATION_RETRY_NUDGE,
             sanitizedHistory,
-            { ...modelBudget, requestHost, correlationId }
+            { ...modelBudget, modelId: modelId, correlationId }
           );
         }
       }
@@ -900,7 +901,7 @@ export async function POST(request: NextRequest) {
             sanitizedHistory,
             {
               ...bumpedBudget,
-              requestHost,
+              modelId: modelId,
               correlationId,
               onToken,
               emitTokensToClient: streamTokensToClient,
@@ -911,7 +912,7 @@ export async function POST(request: NextRequest) {
             sanitizedMessage,
             systemPromptWithCompletion + REPLY_COMPLETION_RETRY_NUDGE,
             sanitizedHistory,
-            { ...bumpedBudget, requestHost, correlationId }
+            { ...bumpedBudget, modelId: modelId, correlationId }
           );
         }
         const cleanedRetry = normalizeAssistantTables(cleanAiReply(retryReply));
@@ -1016,8 +1017,7 @@ export async function POST(request: NextRequest) {
               errMsg: mapped.message,
               status: mapped.status,
               cause: error instanceof Error ? error.message : String(error),
-              modelTier: resolveWorkersAiModelTier(requestHost),
-              modelChain: resolveProductionChatModelChain(requestHost).join(" → "),
+              model: chatModelId,
             });
             enqueue(encodeSseEvent("error", { error: mapped.message, status: mapped.status }));
             controller.close();
@@ -1036,14 +1036,13 @@ export async function POST(request: NextRequest) {
       return withVerifiedCookie(jsonError("Invalid JSON in request body", 400));
     }
     const mapped = mapChatError(error);
-    const requestHost = request.headers.get("host");
+    const { getDefaultChatModel } = await import("@/lib/chat/models");
     logger.error("Chat API error", {
       correlationId,
       errMsg: mapped.message,
       status: mapped.status,
       cause: error instanceof Error ? error.message : String(error),
-      modelTier: resolveWorkersAiModelTier(requestHost),
-      modelChain: resolveProductionChatModelChain(requestHost).join(" → "),
+      model: chatModelId ?? getDefaultChatModel(),
     });
     return withVerifiedCookie(jsonError(mapped.message, mapped.status));
   }

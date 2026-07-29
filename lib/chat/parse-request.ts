@@ -3,6 +3,7 @@ import {
   CHAT_MAX_HISTORY_CONTENT_LENGTH,
   CHAT_MAX_MESSAGE_LENGTH,
 } from "@/lib/chat/limits";
+import { isAllowedChatModel } from "@/lib/chat/models";
 export const MAX_BODY_SIZE_BYTES = CHAT_MAX_BODY_BYTES;
 /** @deprecated Use CHAT_MAX_MESSAGE_LENGTH from @/lib/chat/limits */
 export const MAX_MESSAGE_LENGTH = CHAT_MAX_MESSAGE_LENGTH;
@@ -19,11 +20,16 @@ export interface ChatRequest {
   selectedSessions?: string[];
   history?: { role: "user" | "assistant"; content: string }[];
   turnstileToken?: string;
+  /** Allowlisted Workers AI model id from client picker. */
+  model?: string;
   /** When true (default), LLM replies use SSE; cache hits always JSON. */
   stream?: boolean;
 }
 
-export function parseChatRequest(raw: unknown): { success: true; data: ChatRequest } | { success: false; error: string } {
+export function parseChatRequest(
+  raw: unknown,
+  hostname?: string | null
+): { success: true; data: ChatRequest } | { success: false; error: string } {
   if (!raw || typeof raw !== "object") return { success: false, error: "Invalid request" };
   const o = raw as Record<string, unknown>;
 
@@ -70,5 +76,17 @@ export function parseChatRequest(raw: unknown): { success: true; data: ChatReque
 
   const stream = o.stream === false ? false : true;
 
-  return { success: true, data: { message, program, selectedSessions, history, turnstileToken, stream } };
+  let model: string | undefined;
+  if (o.model != null) {
+    const modelId = String(o.model).trim();
+    if (!modelId) {
+      return { success: false, error: "Invalid model selection." };
+    }
+    if (!isAllowedChatModel(modelId, hostname)) {
+      return { success: false, error: "Invalid model selection." };
+    }
+    model = modelId;
+  }
+
+  return { success: true, data: { message, program, selectedSessions, history, turnstileToken, model, stream } };
 }

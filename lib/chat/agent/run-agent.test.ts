@@ -1,62 +1,47 @@
-import { describe, expect, it, vi, beforeEach } from "vitest";
+import { describe, expect, it } from "vitest";
 import {
   agentModeForModelChain,
   agentModeForModelId,
   isChatAgentEnabled,
 } from "@/lib/chat/agent/run-agent";
+import { supportsFunctionCalling } from "@/lib/ai";
 import {
-  MODEL_WORKERS_AI_DEV,
-  MODEL_WORKERS_AI_PRODUCTION,
-  supportsFunctionCalling,
-} from "@/lib/ai";
+  CHAT_MODEL_GEMMA_4,
+  CHAT_MODEL_LLAMA_32,
+} from "@/lib/chat/models";
 
 describe("isChatAgentEnabled", () => {
-  beforeEach(() => {
-    vi.unstubAllEnvs();
-  });
-
-  it("is true by default", () => {
-    expect(isChatAgentEnabled()).toBe(true);
-  });
-
-  it("is false when CHAT_USE_AGENT=0", () => {
-    vi.stubEnv("CHAT_USE_AGENT", "0");
-    expect(isChatAgentEnabled()).toBe(false);
-  });
-
-  it("is true when CHAT_USE_AGENT=1", () => {
-    vi.stubEnv("CHAT_USE_AGENT", "1");
+  it("is enabled by default", () => {
     expect(isChatAgentEnabled()).toBe(true);
   });
 });
 
 describe("supportsFunctionCalling", () => {
-  it("enables Gemma production model", () => {
-    expect(supportsFunctionCalling(MODEL_WORKERS_AI_PRODUCTION)).toBe(true);
-    expect(supportsFunctionCalling("google/gemini-3.1-flash-lite")).toBe(true);
+  it("enables FC for Gemma", () => {
+    expect(supportsFunctionCalling(CHAT_MODEL_GEMMA_4)).toBe(true);
   });
 
-  it("disables Llama dev model", () => {
-    expect(supportsFunctionCalling(MODEL_WORKERS_AI_DEV)).toBe(false);
+  it("disables FC for Llama", () => {
+    expect(supportsFunctionCalling(CHAT_MODEL_LLAMA_32)).toBe(false);
   });
 });
 
 describe("agentModeForModelId", () => {
-  it("uses tools for Gemma on dev host selection", () => {
-    expect(agentModeForModelId(MODEL_WORKERS_AI_PRODUCTION)).toBe("tools");
+  it("uses tools mode for Gemma", () => {
+    expect(agentModeForModelId(CHAT_MODEL_GEMMA_4)).toBe("tools");
   });
 
-  it("uses compact fallback for Llama", () => {
-    expect(agentModeForModelId(MODEL_WORKERS_AI_DEV)).toBe("compact");
+  it("uses compact mode for Llama", () => {
+    expect(agentModeForModelId(CHAT_MODEL_LLAMA_32)).toBe("compact");
   });
 });
 
 describe("agentModeForModelChain", () => {
-  it("uses tools when chain includes a function-calling model", () => {
-    expect(agentModeForModelChain([MODEL_WORKERS_AI_PRODUCTION])).toBe("tools");
+  it("uses tools when any model supports FC", () => {
+    expect(agentModeForModelChain([CHAT_MODEL_GEMMA_4])).toBe("tools");
   });
 
-  it("uses compact fallback for dev-only chain", () => {
-    expect(agentModeForModelChain([MODEL_WORKERS_AI_DEV])).toBe("compact");
+  it("uses compact for Llama-only chain", () => {
+    expect(agentModeForModelChain([CHAT_MODEL_LLAMA_32])).toBe("compact");
   });
 });

@@ -10,44 +10,38 @@ import {
 import { CHAT_MAX_MESSAGE_LENGTH } from "@/lib/chat/limits";
 import { trimHistoryForModel } from "@/lib/chat/history-for-model";
 import {
+  CHAT_MODEL_GEMMA_4,
+  CHAT_MODEL_LLAMA_32,
+  CHAT_MODEL_LLAMA_4_SCOUT,
+  CHAT_MODEL_MISTRAL_SMALL,
+  DEFAULT_CHAT_MODEL,
+  getChatLimits,
+  getDefaultChatModel,
+  getMaxOutputTokens,
   MAX_OUTPUT_TOKENS,
-  MODEL_WORKERS_AI_DEV,
-  MODEL_WORKERS_AI_PRODUCTION,
-  getMaxOutputTokensForHost,
-  getWorkersAiTierLimits,
-  hostSupportsReasoningUi,
-  modelChainSupportsReasoningUi,
-  resolveProductionChatModelChain,
-  resolveWorkersAiModelId,
-  resolveWorkersAiModelTier,
-  resolveWorkersAiTierForModelId,
+  modelSupportsFunctionCalling,
+  resolveChatModel,
   supportsReasoningUi,
-  type WorkersAiModelTier,
-  type WorkersAiTierLimits,
-} from "@/lib/workers-ai-model-tier";
+  type ChatLimits,
+} from "@/lib/chat/models";
 
 export {
+  CHAT_MODEL_GEMMA_4,
+  CHAT_MODEL_LLAMA_32,
+  CHAT_MODEL_LLAMA_4_SCOUT,
+  CHAT_MODEL_MISTRAL_SMALL,
+  CHAT_MODELS,
+  DEFAULT_CHAT_MODEL,
+  getChatLimits,
+  getDefaultChatModel,
+  getMaxOutputTokens,
+  getVisibleChatModels,
   MAX_OUTPUT_TOKENS,
-  MODEL_WORKERS_AI_DEV,
-  MODEL_WORKERS_AI_PRODUCTION,
-  getMaxOutputTokensForHost,
-  getWorkersAiTierLimits,
-  hostSupportsReasoningUi,
-  modelChainSupportsReasoningUi,
-  resolveProductionChatModelChain,
-  resolveWorkersAiModelId,
-  resolveWorkersAiModelTier,
-  resolveWorkersAiTierForModelId,
+  resolveChatModel,
   supportsReasoningUi,
-  type WorkersAiModelTier,
-  type WorkersAiTierLimits,
-};
-
-/** @deprecated Use MODEL_WORKERS_AI_DEV */
-export const MODEL_WORKERS_AI = MODEL_WORKERS_AI_DEV;
-
-/** @deprecated Use MAX_OUTPUT_TOKENS */
-export const MAX_TOKENS_LLAMA = MAX_OUTPUT_TOKENS;
+  type ChatLimits,
+  type ChatModelOption,
+} from "@/lib/chat/models";
 
 const DEFAULT_TEMPERATURE = 0.2;
 
@@ -150,7 +144,7 @@ function buildMessages(
   prompt: string,
   systemPrompt: string | undefined,
   history: ChatMessage[] | undefined,
-  limits: WorkersAiTierLimits
+  limits: ChatLimits
 ): { role: "system" | "user" | "assistant"; content: string }[] {
   const messages: { role: "system" | "user" | "assistant"; content: string }[] = [];
 
@@ -407,14 +401,12 @@ export async function askWorkersAi(
   options?: {
     maxTokens?: number;
     temperature?: number;
-    /** Request Host header — selects production vs dev model on Cloudflare Pages. */
-    requestHost?: string | null;
+    modelId?: string | null;
     correlationId?: string;
   }
 ): Promise<string> {
-  const tier = resolveWorkersAiModelTier(options?.requestHost);
-  const limits = getWorkersAiTierLimits(tier);
-  const modelChain = resolveProductionChatModelChain(options?.requestHost);
+  const limits = getChatLimits();
+  const modelChain = [resolveChatModel(options?.modelId)];
   const messages = buildMessages(prompt, systemPrompt, history, limits);
   const max_tokens = options?.maxTokens ?? limits.maxOutputTokens;
   const temperature = options?.temperature ?? DEFAULT_TEMPERATURE;
@@ -638,7 +630,7 @@ async function workersAiChatCompletionStream(params: {
 export interface StreamWorkersAiOptions {
   maxTokens?: number;
   temperature?: number;
-  requestHost?: string | null;
+  modelId?: string | null;
   correlationId?: string;
   onToken: (token: string) => void | Promise<void>;
   onReasoningToken?: (token: string) => void | Promise<void>;
@@ -653,14 +645,12 @@ export async function streamWorkersAi(
   history: ChatMessage[] | undefined,
   options: StreamWorkersAiOptions
 ): Promise<string> {
-  const tier = resolveWorkersAiModelTier(options.requestHost);
-  const limits = getWorkersAiTierLimits(tier);
-  const modelChain = resolveProductionChatModelChain(options.requestHost);
+  const limits = getChatLimits();
+  const modelChain = [resolveChatModel(options.modelId)];
   const messages = buildMessages(prompt, systemPrompt, history, limits);
   const max_tokens = options.maxTokens ?? limits.maxOutputTokens;
   const temperature = options.temperature ?? DEFAULT_TEMPERATURE;
-  const emitTokens =
-    options.emitTokensToClient ?? shouldStreamTokensToClient(options.requestHost);
+  const emitTokens = options.emitTokensToClient ?? shouldStreamTokensToClient();
 
   let lastError: unknown = null;
   for (let i = 0; i < modelChain.length; i++) {
@@ -741,9 +731,7 @@ export type AgentChatMessage =
 
 /** Models that support Workers AI traditional function calling in this app. */
 export function supportsFunctionCalling(modelId: string): boolean {
-  if (isGemmaThinkingCapableModel(modelId)) return true;
-  if (isGooglePartnerModelId(modelId)) return true;
-  return false;
+  return modelSupportsFunctionCalling(modelId);
 }
 
 export function extractToolCalls(result: unknown): WorkersAiToolCall[] {
@@ -1064,7 +1052,7 @@ export interface RunWorkersAiAgentParams {
   history?: ChatMessage[];
   preloadMessages?: AgentChatMessage[];
   tools: FlatToolDefinition[];
-  requestHost?: string | null;
+  modelId?: string | null;
   correlationId?: string;
   maxTokens: number;
   temperature: number;
@@ -1092,18 +1080,14 @@ export async function runWorkersAiAgent(params: RunWorkersAiAgentParams): Promis
     throw err;
   }
 
-  const modelId = resolveProductionChatModelChain(params.requestHost).find((id) =>
-    supportsFunctionCalling(id)
-  );
+  const modelId = resolveChatModel(params.modelId);
 
-  if (!modelId || !supportsFunctionCalling(modelId)) {
-    throw new Error("No function-calling model available in the configured chain");
+  if (!supportsFunctionCalling(modelId)) {
+    throw new Error("No function-calling model available for this turn");
   }
 
-  const tier = resolveWorkersAiTierForModelId(modelId, params.requestHost);
-  const limits = getWorkersAiTierLimits(tier);
-  const emitTokens =
-    params.emitTokensToClient ?? shouldStreamTokensToClient(params.requestHost);
+  const limits = getChatLimits();
+  const emitTokens = params.emitTokensToClient ?? shouldStreamTokensToClient();
 
   const workingMessages: AgentChatMessage[] = [
     {

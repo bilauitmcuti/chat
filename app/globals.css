@@ -363,28 +363,6 @@ a:hover,
     @apply bg-background text-foreground;
   }
 
-  /* Remove focus outline from calendar date cells permanently - COMPREHENSIVE FIX */
-  /* Remove ALL focus-related styles including ring, shadow, and outline */
-  .calendar-date-cell,
-  .calendar-date-cell:focus,
-  .calendar-date-cell:focus-visible,
-  .calendar-date-cell:focus-within,
-  .calendar-date-cell:active {
-    outline: none !important;
-    /* Remove focus ring and shadow completely */
-    --tw-ring-offset-shadow: 0 0 #0000 !important;
-    --tw-ring-shadow: 0 0 #0000 !important;
-    box-shadow: var(--tw-ring-offset-shadow, 0 0 #0000), var(--tw-ring-shadow, 0 0 #0000), var(--tw-shadow, 0 0 #0000) !important;
-    /* Remove tap highlight on mobile - critical for mobile devices */
-    -webkit-tap-highlight-color: transparent !important;
-    tap-highlight-color: transparent !important;
-    /* Prevent text selection which can cause focus */
-    user-select: none !important;
-    -webkit-user-select: none !important;
-    -moz-user-select: none !important;
-    -ms-user-select: none !important;
-  }
-
   /* Remove focus outline from tooltip trigger wrapper */
   [data-slot="tooltip-trigger"],
   [data-slot="tooltip-trigger"]:focus,
@@ -399,45 +377,13 @@ a:hover,
     tap-highlight-color: transparent !important;
   }
 
-  /* Override the global outline-ring/50 for calendar cells - only for focus */
-  .calendar-date-cell:focus,
-  .calendar-date-cell:focus-visible,
-  .calendar-date-cell:active {
-    outline: none !important;
-  }
-
-  /* Preserve current date border (1px) - border is not affected by focus ring removal */
-  /* Border will work normally for current date outline */
-  .calendar-date-cell.border {
-    /* Border is separate from focus ring, so it won't be affected */
-  }
-
-  /* Additional mobile-specific fixes */
   @media (hover: none) and (pointer: coarse) {
-    /* Mobile devices */
-    .calendar-date-cell:focus,
-    .calendar-date-cell:focus-visible,
-    .calendar-date-cell:active,
-    .calendar-date-cell:focus-within {
-      outline: none !important;
-      box-shadow: none !important;
-      -webkit-tap-highlight-color: transparent !important;
-    }
-
     [data-slot="tooltip-trigger"]:focus,
     [data-slot="tooltip-trigger"]:focus-visible,
     [data-slot="tooltip-trigger"]:active {
       outline: none !important;
       box-shadow: none !important;
       -webkit-tap-highlight-color: transparent !important;
-    }
-
-    /* Mobile Safari sticky stability:
-       Avoid flicker/peek-through during very fast scrolling.
-       Keep sticky behavior; only adjust painting/compositing hints. */
-    .calendar-controls-sticky {
-      -webkit-backface-visibility: hidden;
-      backface-visibility: hidden;
     }
   }
 
@@ -455,31 +401,6 @@ a:hover,
       transform: scale(0.97);
       transition: transform var(--motion-press) var(--ease-out) !important;
     }
-  }
-
-  /* Hide calendar header during scroll restore to prevent flash on mobile/PWA */
-  .calendar-header-restore-hide {
-    opacity: 0;
-    pointer-events: none;
-  }
-
-  /* Full-viewport overlay during scroll restore - below controls (z-40) so controls stay on top */
-  .calendar-scroll-restore-overlay {
-    position: fixed;
-    inset: 0;
-    z-index: 35;
-    background-color: var(--background);
-    pointer-events: none;
-  }
-
-  /*
-   * Sticky calendar controls: scroll-fade-b on the bg-background row with
-   * pb-6 -mb-6 so the mask fades painted pixels over the calendar below.
-   * Disable scroll(self) animation — the bar does not scroll; window does.
-   */
-  .calendar-controls-scroll-fade.scroll-fade-b {
-    animation: none;
-    --scroll-fade-b: var(--_scroll-fade-size-b);
   }
 
   /* Message scroller viewport: keyboard-scrollable region must not show focus ring */

@@ -1,83 +1,125 @@
 import { afterEach, describe, expect, it, vi } from "vitest";
 import {
-  MODEL_WORKERS_AI_DEV,
-  MODEL_WORKERS_AI_PRODUCTION,
-  hostSupportsReasoningUi,
-  modelChainSupportsReasoningUi,
-  resolveProductionChatModelChain,
-  resolveWorkersAiModelTier,
-  shouldStreamTokensToClient,
+  CHAT_MODEL_GEMMA_4,
+  CHAT_MODEL_LLAMA_32,
+  CHAT_MODEL_LLAMA_4_SCOUT,
+  CHAT_MODEL_MISTRAL_SMALL,
+  DEFAULT_CHAT_MODEL,
+  getVisibleChatModels,
+  isAllowedChatModel,
+  isNonProductionChatHost,
+  PRODUCTION_CHAT_HOST,
+  resolveChatModel,
   supportsReasoningUi,
+  modelSupportsFunctionCalling,
+} from "@/lib/chat/models";
+import {
+  shouldStreamTokensToClient,
+  supportsFunctionCalling,
 } from "@/lib/ai";
 
-describe("resolveProductionChatModelChain", () => {
+describe("resolveChatModel", () => {
   afterEach(() => {
     vi.unstubAllEnvs();
   });
 
-  it("uses Llama on dev host", () => {
-    expect(resolveProductionChatModelChain("localhost:3000")).toEqual([
-      MODEL_WORKERS_AI_DEV,
-    ]);
+  it("defaults to Gemma 4 on all hosts", () => {
+    expect(resolveChatModel()).toBe(DEFAULT_CHAT_MODEL);
+    expect(resolveChatModel(null)).toBe(DEFAULT_CHAT_MODEL);
+    expect(resolveChatModel(undefined)).toBe(DEFAULT_CHAT_MODEL);
   });
 
-  it("uses Gemma on production chat host", () => {
-    vi.stubEnv("NODE_ENV", "production");
-    expect(resolveProductionChatModelChain("chat.bilauitmcuti.com")).toEqual([
-      MODEL_WORKERS_AI_PRODUCTION,
-    ]);
+  it("uses allowlisted client model when provided", () => {
+    expect(resolveChatModel(CHAT_MODEL_LLAMA_32, "localhost")).toBe(CHAT_MODEL_LLAMA_32);
+    expect(resolveChatModel(CHAT_MODEL_LLAMA_4_SCOUT)).toBe(CHAT_MODEL_LLAMA_4_SCOUT);
+    expect(resolveChatModel(CHAT_MODEL_MISTRAL_SMALL)).toBe(CHAT_MODEL_MISTRAL_SMALL);
+    expect(resolveChatModel("@cf/moonshotai/kimi-k2.6")).toBe("@cf/moonshotai/kimi-k2.6");
   });
 
-  it("uses Gemma on Workers preview host", () => {
-    vi.stubEnv("NODE_ENV", "production");
-    expect(resolveProductionChatModelChain("bilauitmcuti-chat.my.workers.dev")).toEqual([
-      MODEL_WORKERS_AI_PRODUCTION,
-    ]);
-    expect(resolveWorkersAiModelTier("bilauitmcuti-chat.my.workers.dev")).toBe("production");
+  it("falls back to default for unknown model ids", () => {
+    expect(resolveChatModel("@cf/unknown/model")).toBe(DEFAULT_CHAT_MODEL);
   });
 
-  it("marks production tier for chat.bilauitmcuti.com", () => {
-    vi.stubEnv("NODE_ENV", "production");
-    expect(resolveWorkersAiModelTier("chat.bilauitmcuti.com")).toBe("production");
+  it("falls back when Llama 3.2 is requested on production", () => {
+    expect(resolveChatModel(CHAT_MODEL_LLAMA_32, PRODUCTION_CHAT_HOST)).toBe(
+      DEFAULT_CHAT_MODEL
+    );
   });
 
-  it("uses dev tier on localhost even when NODE_ENV is production", () => {
-    vi.stubEnv("NODE_ENV", "production");
-    expect(resolveWorkersAiModelTier("localhost:3000")).toBe("dev");
-    expect(resolveProductionChatModelChain("localhost:3000")).toEqual([
-      MODEL_WORKERS_AI_DEV,
-    ]);
+  it("respects WORKERS_AI_MODEL when allowlisted", () => {
+    vi.stubEnv("WORKERS_AI_MODEL", CHAT_MODEL_LLAMA_32);
+    expect(resolveChatModel(undefined, "localhost")).toBe(CHAT_MODEL_LLAMA_32);
+  });
+});
+
+describe("isAllowedChatModel", () => {
+  it("allows all catalog models on localhost", () => {
+    expect(isAllowedChatModel(CHAT_MODEL_GEMMA_4)).toBe(true);
+    expect(isAllowedChatModel(CHAT_MODEL_LLAMA_32, "localhost")).toBe(true);
+    expect(isAllowedChatModel(CHAT_MODEL_LLAMA_4_SCOUT)).toBe(true);
+    expect(isAllowedChatModel(CHAT_MODEL_MISTRAL_SMALL)).toBe(true);
+    expect(isAllowedChatModel("@cf/zai-org/glm-5.2")).toBe(true);
+    expect(isAllowedChatModel("invalid")).toBe(false);
   });
 
-  it("uses Gemma on localhost when WORKERS_AI_USE_PRODUCTION_MODEL=1", () => {
-    vi.stubEnv("WORKERS_AI_USE_PRODUCTION_MODEL", "1");
-    expect(resolveWorkersAiModelTier("localhost:3000")).toBe("production");
-    expect(resolveProductionChatModelChain("localhost:3000")).toEqual([
-      MODEL_WORKERS_AI_PRODUCTION,
-    ]);
+  it("blocks Llama 3.2 on production host", () => {
+    expect(isAllowedChatModel(CHAT_MODEL_LLAMA_32, PRODUCTION_CHAT_HOST)).toBe(false);
+    expect(isAllowedChatModel(CHAT_MODEL_LLAMA_4_SCOUT, PRODUCTION_CHAT_HOST)).toBe(true);
+  });
+});
+
+describe("getVisibleChatModels / isNonProductionChatHost", () => {
+  it("treats localhost and workers.dev as non-production", () => {
+    expect(isNonProductionChatHost("localhost")).toBe(true);
+    expect(isNonProductionChatHost("127.0.0.1:8787")).toBe(true);
+    expect(isNonProductionChatHost("bilauitmcuti-chat.workers.dev")).toBe(true);
+    expect(isNonProductionChatHost(PRODUCTION_CHAT_HOST)).toBe(false);
   });
 
-  it("streams tokens to the chat client (progressive paint, done replaces full reply)", () => {
-    expect(shouldStreamTokensToClient("chat.bilauitmcuti.com")).toBe(true);
-    expect(shouldStreamTokensToClient("localhost:3000")).toBe(true);
+  it("hides Llama 3.2 from production picker", () => {
+    const prod = getVisibleChatModels(PRODUCTION_CHAT_HOST).map((m) => m.id);
+    const local = getVisibleChatModels("localhost").map((m) => m.id);
+    expect(prod).not.toContain(CHAT_MODEL_LLAMA_32);
+    expect(local).toContain(CHAT_MODEL_LLAMA_32);
+    expect(prod).toContain(CHAT_MODEL_LLAMA_4_SCOUT);
+    expect(prod).toContain(CHAT_MODEL_MISTRAL_SMALL);
+  });
+});
+
+describe("supportsFunctionCalling", () => {
+  it("enables FC for Gemma and new frontier models", () => {
+    expect(supportsFunctionCalling(CHAT_MODEL_GEMMA_4)).toBe(true);
+    expect(supportsFunctionCalling(CHAT_MODEL_LLAMA_4_SCOUT)).toBe(true);
+    expect(supportsFunctionCalling(CHAT_MODEL_MISTRAL_SMALL)).toBe(true);
+    expect(supportsFunctionCalling("@cf/moonshotai/kimi-k2.6")).toBe(true);
+    expect(supportsFunctionCalling("@cf/zai-org/glm-5.2")).toBe(true);
+    expect(supportsFunctionCalling("@cf/nvidia/nemotron-3-120b-a12b")).toBe(true);
+  });
+
+  it("disables FC for Llama 3.2", () => {
+    expect(supportsFunctionCalling(CHAT_MODEL_LLAMA_32)).toBe(false);
+    expect(modelSupportsFunctionCalling(CHAT_MODEL_LLAMA_32)).toBe(false);
   });
 });
 
 describe("supportsReasoningUi", () => {
-  it("enables reasoning UI for Gemma and Google partner models", () => {
-    expect(supportsReasoningUi(MODEL_WORKERS_AI_PRODUCTION)).toBe(true);
+  it("enables reasoning UI for Gemma and frontier models", () => {
+    expect(supportsReasoningUi(CHAT_MODEL_GEMMA_4)).toBe(true);
     expect(supportsReasoningUi("@cf/google/gemma-3-12b-it")).toBe(true);
     expect(supportsReasoningUi("google/gemini-2.0-flash")).toBe(true);
+    expect(supportsReasoningUi("@cf/moonshotai/kimi-k2.6")).toBe(true);
   });
 
-  it("disables reasoning UI for dev Llama", () => {
-    expect(supportsReasoningUi(MODEL_WORKERS_AI_DEV)).toBe(false);
+  it("disables reasoning UI for Llama and Mistral Small", () => {
+    expect(supportsReasoningUi(CHAT_MODEL_LLAMA_32)).toBe(false);
+    expect(supportsReasoningUi(CHAT_MODEL_LLAMA_4_SCOUT)).toBe(false);
+    expect(supportsReasoningUi(CHAT_MODEL_MISTRAL_SMALL)).toBe(false);
   });
+});
 
-  it("resolves host support from model chain", () => {
-    expect(modelChainSupportsReasoningUi([MODEL_WORKERS_AI_PRODUCTION])).toBe(true);
-    expect(modelChainSupportsReasoningUi([MODEL_WORKERS_AI_DEV])).toBe(false);
-    expect(hostSupportsReasoningUi("chat.bilauitmcuti.com")).toBe(true);
-    expect(hostSupportsReasoningUi("localhost:3000")).toBe(false);
+describe("shouldStreamTokensToClient", () => {
+  it("streams tokens to the chat client", () => {
+    expect(shouldStreamTokensToClient()).toBe(true);
+    expect(shouldStreamTokensToClient("localhost:3000")).toBe(true);
   });
 });

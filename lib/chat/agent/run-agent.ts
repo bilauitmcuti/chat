@@ -1,5 +1,5 @@
 import {
-  resolveProductionChatModelChain,
+  resolveChatModel,
   runWorkersAiAgent,
   supportsFunctionCalling,
   type ChatMessage,
@@ -34,7 +34,7 @@ export interface RunChatAgentOptions {
   userMessage: string;
   history: ChatMessage[] | undefined;
   ctx: AgentTurnContext;
-  requestHost?: string | null;
+  modelId?: string | null;
   correlationId?: string;
   maxTokens: number;
   temperature: number;
@@ -48,8 +48,8 @@ export interface RunChatAgentOptions {
 }
 
 export async function runChatAgent(options: RunChatAgentOptions): Promise<AgentRunResult> {
-  const modelChain = resolveProductionChatModelChain(options.requestHost);
-  const mode = agentModeForModelChain(modelChain);
+  const modelId = resolveChatModel(options.modelId);
+  const mode = agentModeForModelId(modelId);
 
   if (mode === "compact") {
     return {
@@ -87,7 +87,7 @@ export async function runChatAgent(options: RunChatAgentOptions): Promise<AgentR
     systemPrompt,
     history: options.history,
     tools: workersTools,
-    requestHost: options.requestHost,
+    modelId: options.modelId,
     correlationId: options.correlationId,
     maxTokens: options.maxTokens,
     temperature: options.temperature,

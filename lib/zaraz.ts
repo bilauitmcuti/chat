@@ -6,10 +6,6 @@ export const ZARAZ_EVENTS = {
   pageview: "Pageview",
   chatMessageSent: "chat_message_sent",
   chatFeedback: "chat_feedback",
-  engagementPromptShown: "engagement_prompt_shown",
-  engagementRating: "engagement_rating",
-  engagementShare: "engagement_share",
-  engagementFeedbackClick: "engagement_feedback_click",
 } as const;
 
 type ZarazEventName = (typeof ZARAZ_EVENTS)[keyof typeof ZARAZ_EVENTS];

@@ -33,6 +33,11 @@ import {
   InputGroupTextarea,
 } from "@/components/ui/input-group";
 import { ResponsiveOverlayShell } from "@/components/ui/responsive-overlay-shell";
+import {
+  ModelSelectorLogo,
+  ModelSelectorLogoPreload,
+  ModelSelectorName,
+} from "@/components/ai-elements/model-selector";
 import { cn } from "@/lib/utils";
 import { MAX_CHAT_MESSAGE_LENGTH } from "@/components/chat/chat-utils";
 
@@ -89,6 +94,12 @@ interface ChatComposerProps {
     selectedProgram: ProgramValue,
     selectedSessions: SessionId[]
   ) => string;
+  chatModels: readonly { id: string; name: string; provider: string }[];
+  selectedModelId: string;
+  selectedModelLabel: string;
+  modelDropdownOpen: boolean;
+  onModelDropdownOpenChange: (open: boolean) => void;
+  onModelSelect: (modelId: string) => void;
 }
 
 export function ChatComposer({
@@ -128,6 +139,12 @@ export function ChatComposer({
   onSessionToggle,
   onProgramSelect,
   formatGroupASessionTriggerLabel,
+  chatModels,
+  selectedModelId,
+  selectedModelLabel,
+  modelDropdownOpen,
+  onModelDropdownOpenChange,
+  onModelSelect,
 }: ChatComposerProps) {
   const submenuSwitchingRef = useRef(false);
   const sendDisabled =
@@ -143,6 +160,9 @@ export function ChatComposer({
         isEmptyChat && "lg:pt-0 lg:pb-10"
       )}
     >
+      <ModelSelectorLogoPreload
+        providers={chatModels.map((model) => model.provider)}
+      />
       <div className="mx-auto flex w-full min-w-0 max-w-[600px] flex-col px-2 md:px-0">
         {feedbackError && (
           <p className="text-xs text-destructive mb-2 px-1" role="status">
@@ -459,7 +479,61 @@ export function ChatComposer({
                   </div>
                 </DropdownMenuContent>
               </DropdownMenu>
-              <InputGroupButton
+              <div className="flex items-center gap-1 shrink-0">
+                <DropdownMenu
+                  open={modelDropdownOpen}
+                  onOpenChange={onModelDropdownOpenChange}
+                >
+                  <DropdownMenuTrigger
+                    render={
+                      <Button
+                        type="button"
+                        variant="ghost"
+                        size="sm"
+                        className="h-8 min-w-0 max-w-[120px] sm:max-w-[160px] overflow-hidden text-primary border-none bg-transparent shadow-none px-2 gap-1 rounded-lg font-medium hover:bg-transparent hover:text-primary dark:hover:bg-transparent dark:hover:text-primary aria-expanded:bg-transparent aria-expanded:text-primary"
+                      />
+                    }
+                  >
+                    <span className="block min-w-0 flex-1 truncate text-left text-xs text-primary sm:text-sm">
+                      {selectedModelLabel}
+                    </span>
+                    {modelDropdownOpen ? (
+                      <HugeiconsIcon icon={ArrowUp01Icon} strokeWidth={2} className="opacity-50 shrink-0 size-3.5" />
+                    ) : (
+                      <HugeiconsIcon icon={ArrowDown01Icon} strokeWidth={2} className="opacity-50 shrink-0 size-3.5" />
+                    )}
+                  </DropdownMenuTrigger>
+                  <DropdownMenuContent
+                    className="min-w-[220px] pt-3 pb-3 pl-2 pr-2 bg-popover dark:bg-[#2A2A2A]"
+                    align="end"
+                  >
+                    {chatModels.map((model) => (
+                      <DropdownMenuItem
+                        key={model.id}
+                        className={cn(
+                          "relative cursor-pointer flex items-center gap-2 py-2 pr-8",
+                          model.id === selectedModelId ? "text-primary" : ""
+                        )}
+                        onClick={() => onModelSelect(model.id)}
+                      >
+                        <ModelSelectorLogo
+                          provider={model.provider}
+                          className="size-4 shrink-0"
+                        />
+                        <ModelSelectorName className="font-medium text-sm">
+                          {model.name}
+                        </ModelSelectorName>
+                        {model.id === selectedModelId ? (
+                          <span
+                            className="pointer-events-none absolute right-2 top-1/2 -translate-y-1/2 flex size-3 shrink-0 items-center justify-center rounded-full border border-primary bg-primary"
+                            aria-hidden
+                          />
+                        ) : null}
+                      </DropdownMenuItem>
+                    ))}
+                  </DropdownMenuContent>
+                </DropdownMenu>
+                <InputGroupButton
                 type="submit"
                 variant="default"
                 size="icon-sm"
@@ -469,6 +543,7 @@ export function ChatComposer({
               >
                 <HugeiconsIcon icon={ArrowUp02Icon} strokeWidth={2} />
               </InputGroupButton>
+              </div>
             </InputGroupAddon>
           </InputGroup>
         </form>

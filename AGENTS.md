@@ -24,7 +24,7 @@ npx wrangler login             # required for local Workers AI binding
 - `DISCORD_WEBHOOK_CHAT_HELPFUL` / `DISCORD_WEBHOOK_CHAT_NOT_HELPFUL` — chat AI thumbs up/down (`POST /chat/feedback/api`). Do not use `NEXT_PUBLIC_*` or commit URLs.
 - `CALENDAR_API_BASE` — optional server-only override for the calendar API origin (default `https://api.bilauitmcuti.com`). Browser uses same-origin `/api/v1/meta` and `/api/v1/calendar`.
 - `CHAT_USE_AGENT` — set to `0` or `false` to disable tool-calling agent globally. See [`lib/chat/agent/run-agent.ts`](lib/chat/agent/run-agent.ts).
-- `AI_GATEWAY_ID` — AI Gateway name (default `buc-chat`). Declared in [`wrangler.jsonc`](wrangler.jsonc) `vars`. Set to `off` to bypass.
+- `AI_GATEWAY_ID` — AI Gateway name (default / production: `buc-chat`). Declared in [`wrangler.jsonc`](wrangler.jsonc) `vars` and local `.env.local`. Set to `off` to bypass.
 - `SKIP_AI_GATEWAY=1` — chat calls Workers AI directly without gateway.
 
 ## Commands

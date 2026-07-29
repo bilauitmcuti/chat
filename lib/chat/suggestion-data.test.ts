@@ -8,12 +8,12 @@ import {
 import { isCalendarQuestion } from "@/lib/chat/intent";
 
 describe("suggestion pools", () => {
-  it("Group A has 30 questions", () => {
-    expect(SUGGESTIONS_GROUP_A).toHaveLength(30);
+  it("Group A has 29 questions", () => {
+    expect(SUGGESTIONS_GROUP_A).toHaveLength(29);
   });
 
-  it("Group B has 30 questions", () => {
-    expect(SUGGESTIONS_GROUP_B).toHaveLength(30);
+  it("Group B has 29 questions", () => {
+    expect(SUGGESTIONS_GROUP_B).toHaveLength(29);
   });
 
   it("has general UiTM questions", () => {

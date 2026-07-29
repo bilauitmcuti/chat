@@ -84,7 +84,7 @@ Dashboard: Worker **`chat`** → **Settings → Build**.
 | Deploy command | `npx wrangler deploy` |
 | Non-production deploy | `npx wrangler versions upload` (or `pnpm run upload` to build+upload in one step) |
 
-Both scripts run `opennextjs-cloudflare build` and create `.open-next/`. If the build step runs `next build` alone (or skips OpenNext), deploy fails with:
+Both scripts run `opennextjs-cloudflare build` and create `.open-next/`. [`open-next.config.ts`](open-next.config.ts) sets `buildCommand: "next build"` so the OpenNext step does not re-invoke `pnpm build` (infinite recursion). If the build step skips OpenNext entirely, deploy fails with:
 
 `Could not find compiled Open Next config, did you run the build command?`
 

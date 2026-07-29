@@ -20,6 +20,8 @@ This project deploys with **OpenNext on Cloudflare Workers**, not Pages / next-o
 
 Scripts: `pnpm preview`, `pnpm deploy`, `pnpm upload` (preview versions). `build` and `build:worker` both run OpenNext.
 
+[`open-next.config.ts`](open-next.config.ts) sets `buildCommand: "next build"` so OpenNext does not call `pnpm build` (which would recurse into OpenNext).
+
 ## Workers Builds (Git) — dashboard must match
 
 Worker → **Settings → Build**:
@@ -41,7 +43,7 @@ Both build scripts run `opennextjs-cloudflare build` and produce `.open-next/`. 
 ## Do not
 
 - Reintroduce `@cloudflare/next-on-pages` or `pages_build_output_dir` without an explicit migration back to Pages.
-- Change `package.json` `"build"` back to `next build` only — Workers Builds often calls `pnpm run build`; it must produce `.open-next/`.
+- Remove `buildCommand: "next build"` from `open-next.config.ts` while `"build"` is OpenNext — that causes infinite `opennextjs-cloudflare build` recursion.
 - Add a zone route `bilauitmcuti.com/_next/*` that steals apex calendar assets.
 
 ## Local verify

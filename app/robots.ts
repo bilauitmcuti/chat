@@ -1,11 +1,16 @@
 import type { MetadataRoute } from "next";
 
-/** Site is temporarily noindex — reopen indexing later via layout metadata + allow rules. */
+/** Block crawlers from API and chat endpoints; page indexing is controlled via layout metadata. */
 export default function robots(): MetadataRoute.Robots {
   return {
     rules: {
       userAgent: "*",
-      disallow: "/",
+      allow: "/",
+      disallow: [
+        "/api/",
+        "/chat/api",
+        "/chat/feedback/",
+      ],
     },
   };
 }

@@ -187,7 +187,7 @@ export function ChatComposer({
         >
           <InputGroup
             className={cn(
-              "h-auto min-h-0 flex-col rounded-[10px] border-border bg-secondary shadow-none dark:bg-[#2A2A2A]",
+              "h-auto min-h-0 flex-col rounded-[10px] border-border bg-secondary shadow-none dark:bg-secondary",
               "has-[[data-slot=input-group-control]:focus-visible]:ring-0"
             )}
           >
@@ -226,7 +226,7 @@ export function ChatComposer({
                 placeholder={placeholder}
                 disabled={isLoading}
                 rows={1}
-                className="chat-input relative z-10 min-h-[44px] max-h-[130px] resize-none border-0 bg-transparent px-3 pt-3 pb-1 text-sm leading-relaxed shadow-none focus-visible:ring-0 md:text-[0.9375rem]"
+                className="chat-input relative z-10 min-h-[64px] max-h-[130px] resize-none border-0 bg-transparent px-3 pt-3 pb-1 text-sm leading-relaxed shadow-none focus-visible:ring-0 md:text-[0.9375rem]"
               />
             </div>
             <ResponsiveOverlayShell
@@ -277,7 +277,7 @@ export function ChatComposer({
                       type="button"
                       variant="ghost"
                       size="sm"
-                      className="h-8 min-w-0 max-w-[180px] sm:max-w-[260px] md:max-w-[300px] overflow-hidden text-primary border-none bg-transparent shadow-none px-2 gap-1 rounded-lg font-medium hover:bg-transparent hover:text-primary dark:hover:bg-transparent dark:hover:text-primary aria-expanded:bg-transparent aria-expanded:text-primary"
+                      className="h-8 min-w-0 max-w-[180px] sm:max-w-[260px] md:max-w-[300px] overflow-hidden text-primary border-none bg-transparent shadow-none px-2 gap-1 rounded-lg font-medium hover:bg-[color-mix(in_oklch,var(--accent),var(--foreground)_8%)] hover:text-primary dark:hover:bg-[color-mix(in_oklch,var(--accent),var(--foreground)_12%)] aria-expanded:bg-[color-mix(in_oklch,var(--accent),var(--foreground)_8%)] dark:aria-expanded:bg-[color-mix(in_oklch,var(--accent),var(--foreground)_12%)] aria-expanded:text-primary"
                     />
                   }
                 >
@@ -490,7 +490,7 @@ export function ChatComposer({
                         type="button"
                         variant="ghost"
                         size="sm"
-                        className="h-8 shrink-0 text-primary border-none bg-transparent shadow-none px-2 gap-1 rounded-lg font-medium hover:bg-transparent hover:text-primary dark:hover:bg-transparent dark:hover:text-primary aria-expanded:bg-transparent aria-expanded:text-primary"
+                        className="h-8 shrink-0 text-primary border-none bg-transparent shadow-none px-2 gap-1 rounded-lg font-medium hover:bg-[color-mix(in_oklch,var(--accent),var(--foreground)_8%)] hover:text-primary dark:hover:bg-[color-mix(in_oklch,var(--accent),var(--foreground)_12%)] aria-expanded:bg-[color-mix(in_oklch,var(--accent),var(--foreground)_8%)] dark:aria-expanded:bg-[color-mix(in_oklch,var(--accent),var(--foreground)_12%)] aria-expanded:text-primary"
                       />
                     }
                   >

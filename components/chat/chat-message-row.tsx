@@ -123,10 +123,10 @@ export function ChatMessageRow({
             <ContextMenu>
               <ContextMenuTrigger
                 render={
-                  <Bubble align="end" className="cursor-context-menu select-none" />
+                  <Bubble variant="muted" align="end" className="cursor-context-menu select-none" />
                 }
               >
-                <BubbleContent className="rounded-br-md whitespace-pre-wrap">
+                <BubbleContent className="rounded-br-md border-0 whitespace-pre-wrap">
                   {message.content}
                 </BubbleContent>
               </ContextMenuTrigger>

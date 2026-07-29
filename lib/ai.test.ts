@@ -5,6 +5,7 @@ import {
   CHAT_MODEL_LLAMA_4_SCOUT,
   CHAT_MODEL_MISTRAL_SMALL,
   DEFAULT_CHAT_MODEL,
+  getModelMaxOutputTokens,
   getVisibleChatModels,
   isAllowedChatModel,
   isNonProductionChatHost,
@@ -83,6 +84,25 @@ describe("getVisibleChatModels / isNonProductionChatHost", () => {
     expect(local).toContain(CHAT_MODEL_LLAMA_32);
     expect(prod).toContain(CHAT_MODEL_LLAMA_4_SCOUT);
     expect(prod).toContain(CHAT_MODEL_MISTRAL_SMALL);
+  });
+});
+
+describe("getModelMaxOutputTokens", () => {
+  it("uses the global ceiling for Gemma and mid-size models", () => {
+    expect(getModelMaxOutputTokens(CHAT_MODEL_GEMMA_4)).toBe(8192);
+    expect(getModelMaxOutputTokens(CHAT_MODEL_LLAMA_4_SCOUT)).toBe(8192);
+    expect(getModelMaxOutputTokens(CHAT_MODEL_MISTRAL_SMALL)).toBe(8192);
+  });
+
+  it("applies per-model ceilings", () => {
+    expect(getModelMaxOutputTokens(CHAT_MODEL_LLAMA_32)).toBe(2048);
+    expect(getModelMaxOutputTokens("@cf/moonshotai/kimi-k2.6")).toBe(4096);
+    expect(getModelMaxOutputTokens("@cf/zai-org/glm-5.2")).toBe(4096);
+    expect(getModelMaxOutputTokens("@cf/nvidia/nemotron-3-120b-a12b")).toBe(4096);
+  });
+
+  it("falls back to the global ceiling for unknown model ids", () => {
+    expect(getModelMaxOutputTokens("@cf/unknown/model")).toBe(8192);
   });
 });
 

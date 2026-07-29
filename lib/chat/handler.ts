@@ -1,7 +1,7 @@
 import { NextRequest, NextResponse } from "next/server";
 import {
   getAiBinding,
-  getMaxOutputTokens,
+  getModelMaxOutputTokens,
   resolveChatModel,
   shouldStreamTokensToClient,
   type ChatMessage,
@@ -621,7 +621,7 @@ export async function POST(request: NextRequest) {
       }
     }
 
-    const maxOutputTokens = getMaxOutputTokens();
+    const maxOutputTokens = getModelMaxOutputTokens(modelId);
     const modelBudget = getModelResponseBudget(
       sanitizedMessage,
       !useResearchOnly,

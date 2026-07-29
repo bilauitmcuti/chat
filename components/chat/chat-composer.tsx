@@ -490,11 +490,11 @@ export function ChatComposer({
                         type="button"
                         variant="ghost"
                         size="sm"
-                        className="h-8 min-w-0 max-w-[120px] sm:max-w-[160px] overflow-hidden text-primary border-none bg-transparent shadow-none px-2 gap-1 rounded-lg font-medium hover:bg-transparent hover:text-primary dark:hover:bg-transparent dark:hover:text-primary aria-expanded:bg-transparent aria-expanded:text-primary"
+                        className="h-8 shrink-0 text-primary border-none bg-transparent shadow-none px-2 gap-1 rounded-lg font-medium hover:bg-transparent hover:text-primary dark:hover:bg-transparent dark:hover:text-primary aria-expanded:bg-transparent aria-expanded:text-primary"
                       />
                     }
                   >
-                    <span className="block min-w-0 flex-1 truncate text-left text-xs text-primary sm:text-sm">
+                    <span className="whitespace-nowrap text-left text-xs text-primary sm:text-sm">
                       {selectedModelLabel}
                     </span>
                     {modelDropdownOpen ? (

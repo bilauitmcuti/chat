@@ -18,6 +18,7 @@ import {
   getChatLimits,
   getDefaultChatModel,
   getMaxOutputTokens,
+  getModelMaxOutputTokens,
   MAX_OUTPUT_TOKENS,
   modelSupportsFunctionCalling,
   resolveChatModel,
@@ -35,6 +36,7 @@ export {
   getChatLimits,
   getDefaultChatModel,
   getMaxOutputTokens,
+  getModelMaxOutputTokens,
   getVisibleChatModels,
   MAX_OUTPUT_TOKENS,
   resolveChatModel,
@@ -1069,6 +1071,9 @@ export interface RunWorkersAiAgentParams {
   onSynthesis?: () => void | Promise<void>;
 }
 
+/** Tool-call steps only need room for JSON; keep answer budget for synthesis. */
+const AGENT_TOOL_STEP_MAX_TOKENS = 1024;
+
 /** Tool-calling agent loop; uses the first FC-capable model in the host chain. */
 export async function runWorkersAiAgent(params: RunWorkersAiAgentParams): Promise<string> {
   const ai = await getAiBinding();
@@ -1088,6 +1093,7 @@ export async function runWorkersAiAgent(params: RunWorkersAiAgentParams): Promis
 
   const limits = getChatLimits();
   const emitTokens = params.emitTokensToClient ?? shouldStreamTokensToClient();
+  const toolMaxTokens = Math.min(AGENT_TOOL_STEP_MAX_TOKENS, params.maxTokens);
 
   const workingMessages: AgentChatMessage[] = [
     {
@@ -1124,7 +1130,7 @@ export async function runWorkersAiAgent(params: RunWorkersAiAgentParams): Promis
       modelId,
       workingMessages,
       params.tools,
-      params.maxTokens,
+      toolMaxTokens,
       params.temperature,
       false,
       "tool"

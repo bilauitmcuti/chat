@@ -67,4 +67,24 @@ describe("getModelResponseBudget", () => {
     );
     expect(budget.maxTokens).toBe(2048);
   });
+
+  it("respects a lower model ceiling for simple questions", () => {
+    const budget = getModelResponseBudget(
+      "When is the next break?",
+      true,
+      false,
+      2048
+    );
+    expect(budget.maxTokens).toBe(1024);
+  });
+
+  it("clamps research prompts to a lower model ceiling", () => {
+    const budget = getModelResponseBudget(
+      "What faculties are at UiTM?",
+      false,
+      false,
+      2048
+    );
+    expect(budget.maxTokens).toBe(2048);
+  });
 });

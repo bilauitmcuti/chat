@@ -38,7 +38,7 @@ async function sleep(ms: number): Promise<void> {
   await new Promise((resolve) => setTimeout(resolve, ms));
 }
 
-/** Per-turn ceilings (capped by tier maxOutputTokens in lib/ai.ts). */
+/** Per-turn ceilings (capped by CHAT_LIMITS / per-model ceiling from handler). */
 const TOKEN_CAP_SIMPLE = 1024;
 const TOKEN_CAP_MATCHED = 1536;
 const TOKEN_CAP_CALENDAR = 2048;

@@ -18,6 +18,8 @@ export interface ChatModelOption {
   provider: string;
   functionCalling: boolean;
   reasoningUi: boolean;
+  /** Per-model output ceiling (capped by CHAT_LIMITS.maxOutputTokens). */
+  maxOutputTokens?: number;
   /** Only in picker / allowlist on localhost or Workers preview hosts. */
   nonProductionOnly?: boolean;
 }
@@ -43,6 +45,7 @@ export const CHAT_MODELS: readonly ChatModelOption[] = [
     provider: "llama",
     functionCalling: false,
     reasoningUi: false,
+    maxOutputTokens: 2048,
     nonProductionOnly: true,
   },
   {
@@ -58,6 +61,7 @@ export const CHAT_MODELS: readonly ChatModelOption[] = [
     provider: "moonshotai",
     functionCalling: true,
     reasoningUi: true,
+    maxOutputTokens: 4096,
   },
   {
     id: "@cf/zai-org/glm-5.2",
@@ -65,6 +69,7 @@ export const CHAT_MODELS: readonly ChatModelOption[] = [
     provider: "zai",
     functionCalling: true,
     reasoningUi: true,
+    maxOutputTokens: 4096,
   },
   {
     id: "@cf/nvidia/nemotron-3-120b-a12b",
@@ -72,6 +77,7 @@ export const CHAT_MODELS: readonly ChatModelOption[] = [
     provider: "nvidia",
     functionCalling: true,
     reasoningUi: true,
+    maxOutputTokens: 4096,
   },
 ] as const;
 
@@ -120,6 +126,15 @@ export function getChatLimits(): ChatLimits {
 
 export function getMaxOutputTokens(): number {
   return CHAT_LIMITS.maxOutputTokens;
+}
+
+/** Effective output ceiling for a model (global cap ∩ optional per-model cap). */
+export function getModelMaxOutputTokens(modelId: string): number {
+  const model = getChatModel(modelId);
+  return Math.min(
+    CHAT_LIMITS.maxOutputTokens,
+    model?.maxOutputTokens ?? CHAT_LIMITS.maxOutputTokens
+  );
 }
 
 export function isAllowedChatModel(

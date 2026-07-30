@@ -1,5 +1,7 @@
 import {
   buildAiGatewayRunOptions,
+  isAiGatewayEnabled,
+  resolveAiGatewayId,
   type AiGatewayRunOptions,
 } from "@/lib/ai-gateway";
 import {
@@ -7,6 +9,7 @@ import {
   usesOpenAiFunctionToolFormat,
   type FlatToolDefinition,
 } from "@/lib/chat/agent/tool-format";
+import { getDynamicRouteModelId } from "@/lib/chat/dynamic-routes";
 import { CHAT_MAX_MESSAGE_LENGTH } from "@/lib/chat/limits";
 import { trimHistoryForModel } from "@/lib/chat/history-for-model";
 import {
@@ -124,12 +127,115 @@ function buildChatGatewayMetadata(correlationId?: string): AiGatewayRunOptions["
     : { path: "chat" };
 }
 
+/** Normalize Workers AI flat tools to OpenAI nested function tools for compat. */
+function normalizeToolsToOpenAiCompat(tools: unknown[]): unknown[] {
+  return tools.map((tool) => {
+    if (!tool || typeof tool !== "object") return tool;
+    const t = tool as Record<string, unknown>;
+    if (t.type === "function" && t.function && typeof t.function === "object") {
+      return tool;
+    }
+    if (typeof t.name === "string") {
+      return {
+        type: "function",
+        function: {
+          name: t.name,
+          description: t.description,
+          parameters: t.parameters,
+        },
+      };
+    }
+    return tool;
+  });
+}
+
+/** Build OpenAI-compat chat/completions query for a Dynamic Route. */
+export function buildDynamicRouteCompatQuery(
+  dynamicModelId: string,
+  input: Record<string, unknown>
+): Record<string, unknown> {
+  const query: Record<string, unknown> = { model: dynamicModelId };
+  if (Array.isArray(input.messages)) query.messages = input.messages;
+  if (typeof input.max_tokens === "number") query.max_tokens = input.max_tokens;
+  if (typeof input.temperature === "number") query.temperature = input.temperature;
+  if (input.stream === true) query.stream = true;
+  if (Array.isArray(input.tools) && input.tools.length > 0) {
+    query.tools = normalizeToolsToOpenAiCompat(input.tools);
+  }
+  return query;
+}
+
+function buildDynamicRouteGatewayHeaders(
+  gatewayOpts?: AiGatewayRunOptions
+): Record<string, string | number | boolean | object> {
+  const headers: Record<string, string | number | boolean | object> = {
+    "cf-aig-collect-log": true,
+  };
+  const metadata = gatewayOpts?.metadata
+    ? Object.fromEntries(
+        Object.entries(gatewayOpts.metadata).filter(([, v]) => v !== undefined)
+      )
+    : undefined;
+  if (metadata && Object.keys(metadata).length > 0) {
+    headers["cf-aig-metadata"] = metadata;
+  }
+  if (gatewayOpts?.skipCache) {
+    headers["cf-aig-skip-cache"] = true;
+  } else if (gatewayOpts?.cacheTtl !== undefined) {
+    headers["cf-aig-cache-ttl"] = gatewayOpts.cacheTtl;
+  }
+  return headers;
+}
+
+async function unwrapGatewayCompatResponse(
+  response: Response,
+  stream: boolean
+): Promise<unknown> {
+  if (!response.ok) {
+    const bodyText = await response.text().catch(() => "");
+    const err = new Error(
+      bodyText.trim() || `AI Gateway dynamic route failed (${response.status})`
+    );
+    Object.assign(err, { status: response.status });
+    throw err;
+  }
+  if (stream) {
+    if (!response.body) throw new Error("Empty stream from AI Gateway dynamic route");
+    return response.body;
+  }
+  const contentType = response.headers.get("content-type") ?? "";
+  if (contentType.includes("application/json")) {
+    return response.json();
+  }
+  const text = await response.text();
+  try {
+    return JSON.parse(text) as unknown;
+  } catch {
+    return text;
+  }
+}
+
 async function runAiWithGateway(
   ai: Ai,
   modelId: string,
   input: Record<string, unknown>,
   gatewayOpts?: AiGatewayRunOptions
 ): Promise<unknown> {
+  const gatewayEnabled = await isAiGatewayEnabled();
+  const dynamicModelId = gatewayEnabled ? getDynamicRouteModelId(modelId) : null;
+
+  if (dynamicModelId) {
+    const gatewayId = await resolveAiGatewayId();
+    const query = buildDynamicRouteCompatQuery(dynamicModelId, input);
+    const response = await ai.gateway(gatewayId).run({
+      provider: "compat",
+      endpoint: "chat/completions",
+      headers: buildDynamicRouteGatewayHeaders(gatewayOpts),
+      query,
+    } as Parameters<ReturnType<Ai["gateway"]>["run"]>[0]);
+    return unwrapGatewayCompatResponse(response, input.stream === true);
+  }
+
   const options = await buildAiGatewayRunOptions(gatewayOpts);
   if (options) {
     return ai.run(modelId, input, options);

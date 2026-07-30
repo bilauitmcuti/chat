@@ -19,6 +19,7 @@ import {
 import {
   shouldStreamTokensToClient,
   supportsFunctionCalling,
+  buildDynamicRouteCompatQuery,
 } from "@/lib/ai";
 
 describe("resolveChatModel", () => {
@@ -161,5 +162,42 @@ describe("shouldStreamTokensToClient", () => {
   it("streams tokens to the chat client", () => {
     expect(shouldStreamTokensToClient()).toBe(true);
     expect(shouldStreamTokensToClient("localhost:3000")).toBe(true);
+  });
+});
+
+describe("buildDynamicRouteCompatQuery", () => {
+  it("maps Workers AI input to OpenAI compat query", () => {
+    expect(
+      buildDynamicRouteCompatQuery("dynamic/llama-scout", {
+        messages: [{ role: "user", content: "hi" }],
+        max_tokens: 256,
+        temperature: 0.2,
+        stream: true,
+        chat_template_kwargs: { enable_thinking: false },
+        tools: [
+          {
+            name: "search",
+            description: "Find rows",
+            parameters: { type: "object", properties: {} },
+          },
+        ],
+      })
+    ).toEqual({
+      model: "dynamic/llama-scout",
+      messages: [{ role: "user", content: "hi" }],
+      max_tokens: 256,
+      temperature: 0.2,
+      stream: true,
+      tools: [
+        {
+          type: "function",
+          function: {
+            name: "search",
+            description: "Find rows",
+            parameters: { type: "object", properties: {} },
+          },
+        },
+      ],
+    });
   });
 });

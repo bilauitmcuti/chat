@@ -130,10 +130,24 @@ After changing settings, **Retry** the failed build (or push a new commit).
 Chat routes Workers AI through AI Gateway via the third argument to `env.AI.run()`. Implementation: [`lib/ai-gateway.ts`](lib/ai-gateway.ts), wired in [`lib/ai.ts`](lib/ai.ts).
 
 1. **AI → AI Gateway → Create Gateway** — name: `buc-chat`
-2. Authentication **On**, log collection **On**
+2. Authentication **On**, log collection **On** (required for Dynamic Routing)
 3. Rate limiting / spend limits / caching as needed (suggested cache TTL 120s)
 
-**Verify:** send a chat on production → AI Gateway → `buc-chat` → Logs.
+### Dynamic Routing (non-Gemma fallback → Gemma 4)
+
+Non-Gemma picker models call AI Gateway Dynamic Routes (`dynamic/<name>`) via `env.AI.gateway("buc-chat").run({ provider: "compat", … })`. On primary error/timeout the route falls back to Gemma 4. **Gemma 4 stays on `AI.run`** (default model unchanged).
+
+| Route | Primary | Fallback |
+|-------|---------|----------|
+| `gemma-4` | Gemma 4 | — (defined for symmetry; app does not call it) |
+| `llama-scout` | Llama 4 Scout | Gemma 4 |
+| `mistral-small` | Mistral Small 3.1 | Gemma 4 |
+| `nemotron` | Nemotron 3 Super | Gemma 4 |
+| `glm-flash` | GLM 4.7 Flash | Gemma 4 |
+
+App mapping: [`lib/chat/dynamic-routes.ts`](lib/chat/dynamic-routes.ts). Routes live on Cloudflare (`buc-chat` → Dynamic Routes); edit/redeploy further changes in the **dashboard**.
+
+**Verify:** send a chat on production → AI Gateway → `buc-chat` → Logs. For non-Gemma picks, confirm fallback uses Gemma when the primary fails/times out (`cf-aig-model`).
 
 ## Chat API
 

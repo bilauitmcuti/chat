@@ -1,4 +1,5 @@
 import type { WorkersAiToolSchema } from "@/lib/chat/agent/types";
+import { usesDynamicRoute } from "@/lib/chat/dynamic-routes";
 
 export interface FlatToolDefinition {
   name: string;
@@ -8,7 +9,9 @@ export interface FlatToolDefinition {
 
 /** Gemma 4 / OpenAI-compatible chat completions expect nested `function` tools. */
 export function usesOpenAiFunctionToolFormat(modelId: string): boolean {
-  return modelId.includes("gemma-4") || modelId.includes("gemma-3");
+  if (modelId.includes("gemma-4") || modelId.includes("gemma-3")) return true;
+  // Dynamic routes call AI Gateway compat chat/completions (OpenAI tool shape).
+  return usesDynamicRoute(modelId);
 }
 
 export function isGooglePartnerModelId(modelId: string): boolean {

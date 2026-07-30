@@ -1,6 +1,7 @@
 "use client";
 
 import { useState, useRef, useEffect, useLayoutEffect, useCallback, useMemo, useSyncExternalStore } from "react";
+import { usePathname } from "next/navigation";
 import { HugeiconsIcon } from "@hugeicons/react";
 import { ArrowLeft01Icon } from "@hugeicons/core-free-icons";
 import { useCalendarHydrationVersion } from "@/components/calendar-hydration-context";
@@ -97,6 +98,8 @@ export default function ChatPage() {
   );
 
   const isDesktopViewport = useDesktopViewport();
+  const pathname = usePathname();
+  const showBackButton = pathname === "/chat" || pathname === "/chat/";
   const programOptions = getProgramOptions();
   const calendarDataVersion = getSnapshot().version;
   const [messages, setMessages] = useState<Message[]>([]);
@@ -1129,22 +1132,24 @@ export default function ChatPage() {
 
   return (
     <div className="relative flex h-dvh flex-col overflow-hidden bg-background text-foreground" data-nosnippet>
-      <div
-        className={`chat-header absolute top-0 left-0 right-0 z-10 px-4 md:px-0 ${
-          headerVisible ? "translate-y-0" : "-translate-y-full"
-        }`}
-      >
-        <header className="flex items-center gap-3 pt-8 pb-3 mx-auto max-w-[600px] w-full">
-          <button
-            type="button"
-            onClick={handleBack}
-            className="flex items-center justify-center w-9 h-9 rounded-full bg-secondary hover:opacity-80"
-            aria-label="Back To Home"
-          >
-            <HugeiconsIcon icon={ArrowLeft01Icon} strokeWidth={2} className="w-5 h-5" />
-          </button>
-        </header>
-      </div>
+      {showBackButton ? (
+        <div
+          className={`chat-header absolute top-0 left-0 right-0 z-10 px-4 md:px-0 ${
+            headerVisible ? "translate-y-0" : "-translate-y-full"
+          }`}
+        >
+          <header className="flex items-center gap-3 pt-8 pb-3 mx-auto max-w-[600px] w-full">
+            <button
+              type="button"
+              onClick={handleBack}
+              className="flex items-center justify-center w-9 h-9 rounded-full bg-secondary hover:opacity-80"
+              aria-label="Back To Home"
+            >
+              <HugeiconsIcon icon={ArrowLeft01Icon} strokeWidth={2} className="w-5 h-5" />
+            </button>
+          </header>
+        </div>
+      ) : null}
       <div className="flex min-h-0 min-w-0 flex-1 flex-col overflow-hidden px-1 md:px-0">
         {isEmptyChat ? (
           <>

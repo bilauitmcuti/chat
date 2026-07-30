@@ -63,4 +63,24 @@ Ini cadangan umum untuk pelajar UiTM.`;
     expect(out).not.toMatch(/^OPINION:/m);
     expect(out).toContain("Ini cadangan umum");
   });
+
+  it("strips MATCHED ACTIVITIES and other context banners from replies", () => {
+    const raw = `=== MATCHED ACTIVITIES (authoritative — copy these dates exactly) ===
+Cuti Semester ialah 01-06-2026 hingga 12-07-2026.
+Jangan rujuk DATA CONTEXT atau search_calendar_activities kepada pengguna.`;
+    const out = cleanAiReply(raw);
+    expect(out).not.toMatch(/MATCHED\s+ACTIVITIES/i);
+    expect(out).not.toMatch(/DATA\s+CONTEXT/i);
+    expect(out).not.toContain("search_calendar_activities");
+    expect(out).not.toMatch(/^===/m);
+    expect(out).toContain("Cuti Semester");
+    expect(out).toContain("01-06-2026");
+  });
+
+  it("strips API field labels like startDate from replies", () => {
+    const raw = "Cuti Semester startDate: 2026-06-01 hingga 12 Jul 2026.";
+    const out = cleanAiReply(raw);
+    expect(out).not.toContain("startDate");
+    expect(out).toContain("Cuti Semester");
+  });
 });

@@ -2,25 +2,33 @@
 
 # Bila UiTM Cuti Chat
 
-AI chat for UiTM academic calendar questions — ask in English or Malay and get dated answers from official calendar data.
+AI chat for UiTM academic calendar questions — ask in English or Malay and get clear, dated answers.
 
 **Live:** [chat.bilauitmcuti.com](https://chat.bilauitmcuti.com)
 
-Part of [Bila UiTM Cuti](https://bilauitmcuti.com) — the companion chat (sometimes called **UiTM Assistant** / **AI Chat UiTM**) helps students check semester dates, lecture weeks 1–14, fee deferment windows, holidays, exams, and related UiTM info without digging through long calendar PDFs.
-
-This repository is public for transparency. Contributions and write access are limited to collaborators. See [Contributing](CONTRIBUTING.md) and the [Code of Conduct](CODE_OF_CONDUCT.md).
+Part of [Bila UiTM Cuti](https://bilauitmcuti.com) — the companion chat (sometimes called **UiTM Assistant** / **AI Chat UiTM**) helps students check semester dates, lecture weeks, fee deferment windows, holidays, exams, and related UiTM info in a short conversation.
 
 ## What it does
 
-Students often need a quick answer: *when is cuti semester?*, *what dates are fee deferment?*, *list week 1–14*, or *is today a holiday?* **Bila UiTM Cuti Chat** turns those questions into a short conversation. Behind the scenes, a tool-calling agent looks up session timelines and activities from the [Bila UiTM Cuti API](https://api.bilauitmcuti.com), then replies with concrete dates scoped to the user’s selected academic session and campus group when relevant.
+Students often need a quick answer: *when is cuti semester?*, *what dates are fee deferment?*, *list week 1–14*, or *is today a holiday?* **Bila UiTM Cuti Chat** turns those questions into a streamed conversation, scoped to the user’s selected academic session and campus group when relevant.
 
 The product stays focused on calendar and UiTM orientation questions. It is not a general-purpose chatbot for coursework, grades, or unofficial campus rumor.
+
+![Models](public/og/models.png)
+
+## Models & capabilities
+
+Users can pick a Cloudflare Workers AI model in the composer. All picker models support **function calling** (tool use).
+
+The chat composer lets users pick from multiple Cloudflare Workers AI models, including Gemma 4 (default), Llama 4 Scout, Mistral Small 3.1, Nemotron 3 Super, and GLM 4.7 Flash. All available models support function calling, enabling the assistant to look up academic facts before answering.
+
+Function calling lets the assistant look up the right academic facts before answering. Reasoning-capable models can show a short thinking/reasoning section in the chat UI for harder questions.
 
 ## Features
 
 - Streaming chat UI for academic calendar and UiTM general questions
-- Tool-calling agent that looks up session timelines, activities, and related calendar data from the Bila UiTM Cuti API
-- Multiple Workers AI models (client picker): Gemma 4, Llama 3.2 3B, Kimi K2.6, GLM 5.2, Nemotron 3 Super
+- Tool-calling agent with function calling across the model picker
+- Reasoning UI for models that support it (Gemma 4, Nemotron 3 Super, GLM 4.7 Flash)
 - Session / program scope picker so answers match the user’s campus group and semester
 - Markdown replies (tables, code, math, diagrams where relevant)
 - Cloudflare Turnstile bot protection on chat
@@ -45,15 +53,14 @@ The product stays focused on calendar and UiTM orientation questions. It is not 
 | Runtime | Cloudflare Workers via `@opennextjs/cloudflare` |
 | Inference | Cloudflare Workers AI + AI Gateway |
 | Bot protection | Cloudflare Turnstile |
-| Calendar data | [api.bilauitmcuti.com](https://api.bilauitmcuti.com) |
 | Tests | Vitest |
 
 ## How chat works (high level)
 
-1. The browser sends the question to the chat API and receives a streamed reply.
-2. Topic routing and activity matching decide whether to run the agent or a compact fallback.
-3. The agent may look up calendar activities, lecture weeks, holidays, and related UiTM knowledge from the same data the main site uses.
-4. Replies are validated before they are shown in the UI.
+1. The browser sends the question and receives a streamed reply.
+2. Topic routing decides whether to run the tool-calling agent or a compact fallback.
+3. Models with function calling may invoke tools, then draft an answer; reasoning-capable models can surface that step in the UI.
+4. Replies are validated before they are shown.
 5. Optional thumbs up/down help improve the product.
 
 Runs in production on Cloudflare Workers at [chat.bilauitmcuti.com](https://chat.bilauitmcuti.com).
@@ -61,6 +68,5 @@ Runs in production on Cloudflare Workers at [chat.bilauitmcuti.com](https://chat
 ## Related
 
 - [Bila UiTM Cuti](https://bilauitmcuti.com) — calendar site
-- [API](https://api.bilauitmcuti.com) — academic calendar & holiday data
-- [Code of Conduct](CODE_OF_CONDUCT.md)
-- [Contributing](CONTRIBUTING.md) — for collaborators
+
+This repository is public for transparency. Contributions and write access are limited to collaborators. See [Contributing](CONTRIBUTING.md) and the [Code of Conduct](CODE_OF_CONDUCT.md).

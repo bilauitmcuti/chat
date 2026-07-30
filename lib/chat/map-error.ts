@@ -1,4 +1,18 @@
 import { normalizeAiErrorMessage } from "@/lib/ai";
+import {
+  CHAT_AI_UNAVAILABLE_MESSAGE,
+  CHAT_EMPTY_REPLY_ERROR_MESSAGE,
+  CHAT_GENERIC_ERROR_MESSAGE,
+  CHAT_MODEL_ACCESS_DENIED_MESSAGE,
+  CHAT_MODEL_ERROR_MESSAGE,
+  CHAT_MODEL_UNAVAILABLE_MESSAGE,
+  CHAT_RATE_LIMIT_MESSAGE,
+  CHAT_REQUEST_TOO_LARGE_MESSAGE,
+  CHAT_SERVER_ERROR_MESSAGE,
+  CHAT_SERVICE_ERROR_MESSAGE,
+  CHAT_TIMEOUT_MESSAGE,
+  CHAT_TOOL_FORMAT_ERROR_MESSAGE,
+} from "@/lib/chat/user-messages";
 
 export function mapChatError(error: unknown): { message: string; status: number } {
   const errMsg = normalizeAiErrorMessage(error).toLowerCase();
@@ -16,27 +30,22 @@ export function mapChatError(error: unknown): { message: string; status: number 
     errMsg.includes("workers ai binding") ||
     errMsg.includes("not configured")
   ) {
-    return {
-      message:
-        "Workers AI is not available. For local dev, restart after `pnpm dev` (loads wrangler.jsonc) or use `pnpm preview`. On Cloudflare Pages, add a Workers AI binding named AI.",
-      status: 503,
-    };
+    if (
+      errMsg.includes("loading") ||
+      errMsg.includes("temporarily unavailable")
+    ) {
+      return { message: CHAT_MODEL_UNAVAILABLE_MESSAGE, status: 503 };
+    }
+    return { message: CHAT_AI_UNAVAILABLE_MESSAGE, status: 503 };
   }
   if (status === 401 || errMsg.includes("401") || errMsg.includes("unauthorized")) {
-    return {
-      message:
-        "Workers AI is not configured. Add an AI binding named AI in Cloudflare Pages settings.",
-      status: 502,
-    };
+    return { message: CHAT_AI_UNAVAILABLE_MESSAGE, status: 502 };
   }
   if (status === 403 || errMsg.includes("403") || errMsg.includes("forbidden")) {
-    return {
-      message: "AI model access denied. Please try again later or contact support.",
-      status: 502,
-    };
+    return { message: CHAT_MODEL_ACCESS_DENIED_MESSAGE, status: 502 };
   }
   if (status === 413 || errMsg.includes("413")) {
-    return { message: "Request too large. Try a shorter message or clear chat history.", status: 413 };
+    return { message: CHAT_REQUEST_TOO_LARGE_MESSAGE, status: 413 };
   }
   if (
     status === 429 ||
@@ -44,71 +53,52 @@ export function mapChatError(error: unknown): { message: string; status: number 
     errMsg.includes("rate limit") ||
     errMsg.includes("too many requests")
   ) {
-    return {
-      message:
-        "AI service is busy or at its usage limit. Please try again in a few minutes.",
-      status: 429,
-    };
+    return { message: CHAT_RATE_LIMIT_MESSAGE, status: 429 };
   }
   if (
-    status === 503 ||
     errMsg.includes("503") ||
     errMsg.includes("loading") ||
     errMsg.includes("unavailable") ||
     errMsg.includes("temporarily unavailable")
   ) {
-    return { message: "AI model is loading. Please try again in a few seconds.", status: 503 };
+    return { message: CHAT_MODEL_UNAVAILABLE_MESSAGE, status: 503 };
   }
   if (status === 504 || errMsg.includes("timeout") || errMsg.includes("timed out")) {
-    return { message: "Request took too long. Please try again.", status: 504 };
+    return { message: CHAT_TIMEOUT_MESSAGE, status: 504 };
   }
   if (errMsg.includes("empty response")) {
-    return {
-      message: "The AI model returned an empty reply. Please try again or rephrase your question.",
-      status: 502,
-    };
-  }
-  if (status === 502 || errMsg.includes("502")) {
-    return {
-      message: "AI service returned an error. Please try again in a moment.",
-      status: 502,
-    };
-  }
-  if (status === 500 || errMsg.includes("500")) {
-    return {
-      message: "AI service error. Please try again shortly.",
-      status: 502,
-    };
+    return { message: CHAT_EMPTY_REPLY_ERROR_MESSAGE, status: 502 };
   }
   if (
-    errMsg.includes("configure ai gateway") ||
-    errMsg.includes("2001")
+    errMsg.includes("no function-calling model") ||
+    (errMsg.includes("model") &&
+      (errMsg.includes("not found") ||
+        errMsg.includes("does not exist") ||
+        errMsg.includes("unsupported") ||
+        errMsg.includes("unknown model")))
   ) {
-    return {
-      message:
-        "AI Gateway is not configured. Create gateway buc-chat in Cloudflare dashboard (AI → AI Gateway), or set SKIP_AI_GATEWAY=1 for local dev.",
-      status: 502,
-    };
+    return { message: CHAT_MODEL_ERROR_MESSAGE, status: 502 };
+  }
+  if (status === 502 || errMsg.includes("502")) {
+    return { message: CHAT_SERVICE_ERROR_MESSAGE, status: 502 };
+  }
+  if (status === 500 || errMsg.includes("500")) {
+    return { message: CHAT_SERVER_ERROR_MESSAGE, status: 502 };
+  }
+  if (errMsg.includes("configure ai gateway") || errMsg.includes("2001")) {
+    return { message: CHAT_SERVICE_ERROR_MESSAGE, status: 502 };
   }
   if (errMsg.includes("partner") || errMsg.includes("unified")) {
-    return {
-      message:
-        "Partner AI model is unavailable. Enable Workers AI partner models in your Cloudflare account or try again later.",
-      status: 502,
-    };
+    return { message: CHAT_MODEL_UNAVAILABLE_MESSAGE, status: 502 };
   }
   if (
     errMsg.includes("validation error") &&
     errMsg.includes("tools") &&
     errMsg.includes("function")
   ) {
-    return {
-      message:
-        "AI tool format error. Please try again; if it persists, switch to Llama or report the issue.",
-      status: 502,
-    };
+    return { message: CHAT_TOOL_FORMAT_ERROR_MESSAGE, status: 502 };
   }
-  return { message: "Failed to get response from AI. Please try again.", status: 500 };
+  return { message: CHAT_GENERIC_ERROR_MESSAGE, status: 500 };
 }
 
 /** @internal */

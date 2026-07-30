@@ -2,8 +2,10 @@ import { describe, expect, it } from "vitest";
 import {
   resolveChatExecutionMode,
   shouldPreferSingleStream,
+  getChatTurnDeadlineMs,
 } from "@/lib/chat/handler";
 import { MAX_AGENT_TOOL_STEPS } from "@/lib/chat/agent/types";
+import { CHAT_TIMEOUT_MESSAGE } from "@/lib/chat/user-messages";
 
 describe("resolveChatExecutionMode", () => {
   it("uses single_stream when agent tools path is disabled (dev Llama)", () => {
@@ -96,7 +98,7 @@ describe("shouldPreferSingleStream", () => {
     ).toBe(true);
   });
 
-  it("uses agent for complex uitm_general turns", () => {
+  it("prefers single_stream for complex uitm_general turns", () => {
     expect(
       shouldPreferSingleStream({
         hasMatchedActivity: false,
@@ -104,7 +106,7 @@ describe("shouldPreferSingleStream", () => {
         topics: ["uitm_general"],
         isComplexTurn: true,
       })
-    ).toBe(false);
+    ).toBe(true);
     expect(
       shouldPreferSingleStream({
         hasMatchedActivity: false,
@@ -112,7 +114,7 @@ describe("shouldPreferSingleStream", () => {
         topics: ["academic_calendar", "uitm_general"],
         isComplexTurn: true,
       })
-    ).toBe(false);
+    ).toBe(true);
   });
 
   it("prefers single_stream for simple uitm_general turns", () => {
@@ -134,7 +136,7 @@ describe("shouldPreferSingleStream", () => {
     ).toBe(true);
   });
 
-  it("uses agent when no topics are routed and the turn is complex", () => {
+  it("prefers single_stream when no topics are routed (including complex)", () => {
     expect(
       shouldPreferSingleStream({
         hasMatchedActivity: false,
@@ -142,7 +144,7 @@ describe("shouldPreferSingleStream", () => {
         topics: [],
         isComplexTurn: true,
       })
-    ).toBe(false);
+    ).toBe(true);
     expect(
       shouldPreferSingleStream({
         hasMatchedActivity: false,
@@ -164,6 +166,19 @@ describe("appendReasoningLine", () => {
     expect(replaceReasoningParagraph("", first)).toBe(first);
     expect(replaceReasoningParagraph(first, second)).toBe(second);
     expect(replaceReasoningParagraph(second, second)).toBe(second);
+  });
+});
+
+describe("getChatTurnDeadlineMs", () => {
+  it("uses 28s for single_stream and 30s for agent (all models)", () => {
+    expect(getChatTurnDeadlineMs("single_stream")).toBe(28_000);
+    expect(getChatTurnDeadlineMs("agent")).toBe(30_000);
+  });
+});
+
+describe("CHAT_TIMEOUT_MESSAGE", () => {
+  it("suggests switching to a faster model", () => {
+    expect(CHAT_TIMEOUT_MESSAGE).toContain("switch to a faster model");
   });
 });
 

@@ -1,5 +1,8 @@
 import { describe, expect, it } from "vitest";
-import { isMinimalConversationalMessage } from "@/lib/chat/intent";
+import {
+  getMinimalChitchatInstruction,
+  isMinimalConversationalMessage,
+} from "@/lib/chat/intent";
 
 describe("isMinimalConversationalMessage", () => {
   it("treats greetings and random short typing as minimal", () => {
@@ -20,5 +23,14 @@ describe("isMinimalConversationalMessage", () => {
     expect(isMinimalConversationalMessage("when is exam")).toBe(false);
     expect(isMinimalConversationalMessage("explain registration")).toBe(false);
     expect(isMinimalConversationalMessage("list all holidays")).toBe(false);
+  });
+});
+
+describe("getMinimalChitchatInstruction", () => {
+  it("asks for a short greeting without calendar dumps", () => {
+    const instruction = getMinimalChitchatInstruction();
+    expect(instruction).toContain("CHITCHAT TURN");
+    expect(instruction).toContain("1–2 short friendly sentences");
+    expect(instruction).toContain("Do NOT list dates");
   });
 });

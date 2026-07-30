@@ -15,7 +15,7 @@ npx wrangler login             # required for local Workers AI binding
 
 - **Workers AI binding** — required for chat. Declared in [`wrangler.jsonc`](wrangler.jsonc) as `ai.binding: "AI"`. No API key secret for inference. Access via `getCloudflareContext()` from `@opennextjs/cloudflare`.
   - **Default model:** Gemma 4 (`@cf/google/gemma-4-26b-a4b-it`) on all environments.
-  - **Client model picker:** users can choose from 5 Workers AI models in the chat composer (Gemma 4, Llama 3.2 3B, Kimi K2.6, GLM 5.2, Nemotron 3 Super). See [`lib/chat/models.ts`](lib/chat/models.ts).
+  - **Client model picker:** users can choose from 5 Workers AI models in the chat composer (Gemma 4, Llama 4 Scout, Mistral Small 3.1, Nemotron 3 Super, GLM 4.7 Flash). See [`lib/chat/models.ts`](lib/chat/models.ts).
   - Optional server default override: `WORKERS_AI_MODEL` (must be an allowlisted model id).
 - `NEXT_PUBLIC_TURNSTILE_SITE_KEY` + `TURNSTILE_SECRET_KEY` — required for Turnstile on chat in production. Set `NEXT_PUBLIC_TURNSTILE_SITE_KEY` in build env, or `TURNSTILE_SITE_KEY` at runtime (client loads via `GET /api/turnstile/config`).
 

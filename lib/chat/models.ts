@@ -8,6 +8,7 @@ export const CHAT_MODEL_LLAMA_4_SCOUT =
   "@cf/meta/llama-4-scout-17b-16e-instruct" as const;
 export const CHAT_MODEL_MISTRAL_SMALL =
   "@cf/mistralai/mistral-small-3.1-24b-instruct" as const;
+export const CHAT_MODEL_GLM_47_FLASH = "@cf/zai-org/glm-4.7-flash" as const;
 
 /** Production chat host — nonProductionOnly models are hidden here. */
 export const PRODUCTION_CHAT_HOST = "chat.bilauitmcuti.com";
@@ -39,7 +40,7 @@ export const CHAT_MODELS: readonly ChatModelOption[] = [
   {
     id: CHAT_MODEL_LLAMA_4_SCOUT,
     name: "Llama 4 Scout",
-    description: "For quick, straightforward answers",
+    description: "Quick everyday answers",
     provider: "llama",
     functionCalling: true,
     reasoningUi: false,
@@ -47,37 +48,26 @@ export const CHAT_MODELS: readonly ChatModelOption[] = [
   {
     id: CHAT_MODEL_MISTRAL_SMALL,
     name: "Mistral Small 3.1",
-    description: "Reliable for everyday conversations",
+    description: "Fast, reliable responses",
     provider: "mistral",
     functionCalling: true,
     reasoningUi: false,
   },
   {
-    id: "@cf/moonshotai/kimi-k2.6",
-    name: "Kimi K2.6",
-    description: "For complex, multi-step tasks",
-    provider: "moonshotai",
-    functionCalling: true,
-    reasoningUi: true,
-    maxOutputTokens: 4096,
-  },
-  {
-    id: "@cf/zai-org/glm-5.2",
-    name: "GLM 5.2",
-    description: "For long, detailed questions",
-    provider: "zai",
-    functionCalling: true,
-    reasoningUi: true,
-    maxOutputTokens: 4096,
-  },
-  {
     id: "@cf/nvidia/nemotron-3-120b-a12b",
     name: "Nemotron 3 Super",
-    description: "For deeper reasoning",
+    description: "Best for complex reasoning",
     provider: "nvidia",
     functionCalling: true,
     reasoningUi: true,
-    maxOutputTokens: 4096,
+  },
+  {
+    id: CHAT_MODEL_GLM_47_FLASH,
+    name: "GLM 4.7 Flash",
+    description: "Detailed explanations",
+    provider: "zai",
+    functionCalling: true,
+    reasoningUi: true,
   },
 ] as const;
 
@@ -179,8 +169,7 @@ export function modelSupportsFunctionCalling(modelId: string): boolean {
   if (isGooglePartnerModelId(modelId)) return true;
   if (modelId.includes("llama-4")) return true;
   if (modelId.includes("mistral-small")) return true;
-  if (modelId.includes("kimi-k2")) return true;
-  if (modelId.includes("glm-5")) return true;
+  if (modelId.includes("glm-4.7") || modelId.includes("glm-5")) return true;
   if (modelId.includes("nemotron-3")) return true;
   return false;
 }

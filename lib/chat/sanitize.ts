@@ -19,6 +19,43 @@ const PLANNING_LINE =
 const INTERNAL_MODE_TAG =
   /\((?:FACT|EXPLAIN|OPINION|OPNION|SUGGESTION|CADANGAN|REASONING|GUIDANCE)\)\s*/gi;
 
+/** Context / tool banners and identifiers that must never appear in user-facing replies. */
+const INTERNAL_CONTEXT_BANNER_LINE =
+  /^\s*=+\s*.+\s*=+\s*$/;
+
+const INTERNAL_CONTEXT_PHRASES =
+  /\b(?:MATCHED\s+ACTIVITIES|CLOSEST\s+MATCHES|DATA\s+CONTEXT|UITM\s+KNOWLEDGE|SESSION\s+LIST|SELECTED\s+SESSIONS|SESSION\s+COMPARISON|SESSION\s+TIMELINE|SCOPED\s+CALENDAR|UPCOMING\s+HINTS|PREFETCHED\s+TOOL\s+DATA|PRELOADED\s+CALENDAR\s+MATCH|QUICK\s+REFERENCE|MALAYSIA\s+PUBLIC\s+HOLIDAYS|LECTURE\s+WEEKS(?:\s*\[[^\]]*\])?|GROUP\s+[AB]\s+ACADEMIC\s+CALENDAR(?:\s*\(API\))?|CURRENT\s+LECTURE\s+WEEK)\b/gi;
+
+const INTERNAL_TOOL_NAMES =
+  /\b(?:search_calendar_activities|get_academic_calendar|get_lecture_weeks|get_public_holidays|get_upcoming_events|get_session_timeline|search_uitm_knowledge)\b/gi;
+
+const INTERNAL_API_FIELD_LABEL =
+  /\b(?:startDate|endDate|programType|programTypes|allStudents|regionalStartDate|regionalEndDate)\s*:/gi;
+
+/**
+ * Strip prompt/context/tool leakage (section banners, variable names, tool ids)
+ * so students never see internal wiring in the reply.
+ */
+export function stripInternalContextLeakage(text: string): string {
+  const withoutBannerLines = text
+    .split("\n")
+    .filter((line) => !INTERNAL_CONTEXT_BANNER_LINE.test(line.trim()))
+    .join("\n");
+
+  return withoutBannerLines
+    .replace(INTERNAL_CONTEXT_PHRASES, "")
+    .replace(INTERNAL_TOOL_NAMES, "")
+    .replace(INTERNAL_API_FIELD_LABEL, "")
+    .replace(/\(\s*authoritative[^)]*\)/gi, "")
+    .replace(/\(\s*API-backed[^)]*\)/gi, "")
+    .replace(/[ \t]{2,}/g, " ")
+    .replace(/[ \t]*([,;:])[ \t]*([,;:])+/g, "$1")
+    .replace(/\(\s*\)/g, "")
+    .replace(/[ \t]+\n/g, "\n")
+    .replace(/\n{3,}/g, "\n\n")
+    .trim();
+}
+
 /** Pull user-visible answer when Gemma/reasoning models leak planning text. */
 export function extractFinalAnswerFromPlanning(raw: string): string | null {
   const answerMatch = /\b(?:Answer|Jawapan):\s*([\s\S]+?)(?=\n(?:Language|Header|Context|User Question|\- No )|$)/i.exec(
@@ -133,5 +170,5 @@ export function cleanAiReply(rawReply: string): string {
     .replace(/\n{3,}/g, "\n\n")
     .trim();
 
-  return cleaned;
+  return stripInternalContextLeakage(cleaned);
 }

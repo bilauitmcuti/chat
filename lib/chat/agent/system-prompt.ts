@@ -19,16 +19,17 @@ const AGENT_DATA_POLICY = `DATA RULES:
 - IMPORTANT TERM SPLIT: "cuti/holiday/break" may mean UiTM academic breaks or Malaysia public holidays. Treat UiTM break names (Cuti Semester, Cuti Pertengahan Semester, study/revision week) as academic calendar items, not public holidays.
 - General UiTM info → search_uitm_knowledge.
 - Tool output overrides your prior knowledge for factual dates and official rows.
-- When search returns CLOSEST MATCHES or a calendar list: pick the official row that best matches the user's words (including abbreviations like SuFO, MDS, RPGT, yuran). State dates from that row only.
-- If no exact row fits: reason over CLOSEST MATCHES and the calendar list; name the nearest official activity, note uncertainty, and answer the user's question as directly as you can from tool evidence.`;
+- When search returns closest-match rows or a calendar list: pick the official activity that best matches the user's words (including abbreviations like SuFO, MDS, RPGT, yuran). State dates from that row only — never name internal section headers in the reply.
+- If no exact row fits: reason over closest matches and the calendar list; name the nearest official activity, note uncertainty, and answer the user's question as directly as you can from tool evidence.`;
 
 const TOOL_USE_POLICY = `TOOL USE:
-- For questions about dates, schedules, weeks, breaks, exams, or holidays, call the relevant tool(s) before stating dates.
+- Call tools only when you need official dates, calendar rows, public holidays, lecture weeks, or exact facts from search_uitm_knowledge.
+- For general, hard, casual, random, explain, or opinion UiTM questions: answer directly using general UiTM student knowledge; mark uncertainty; never invent official calendar dates.
+- When tools are needed for dates/schedules/weeks/holidays, call the relevant tool(s) before stating those dates.
 - search_calendar_activities accepts short keywords and abbreviations; on partial results it may include closest matches plus a calendar excerpt — use those to answer.
-- For explain / why / opinion questions, call search_uitm_knowledge and/or domain tools when available, then synthesize a helpful answer.
-- You may call multiple tools in sequence (e.g. get_lecture_weeks then search_calendar_activities).
+- You may call multiple tools in sequence when structured data is required (e.g. get_lecture_weeks then search_calendar_activities).
 - Program and session are pre-selected — do not ask the user to confirm them on follow-ups.
-- For UiTM general questions: use search_uitm_knowledge as primary source. If exact details are missing, synthesize from tool output and general UiTM student context with a clear uncertainty note when needed.`;
+- After any tool call (including empty or partial results), you MUST produce a final user-facing answer. Never stop after tool calls alone.`;
 
 export function buildAgentSystemPrompt(
   ctx: AgentTurnContext,

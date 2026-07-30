@@ -2,19 +2,19 @@
 
 import { cn } from "@/lib/utils";
 
-interface SuggestionCarouselProps {
+interface SuggestionChipsProps {
   suggestions: string[];
   disabled: boolean;
   onSelect: (suggestion: string) => void;
   className?: string;
 }
 
-export function SuggestionCarousel({
+export function SuggestionChips({
   suggestions,
   disabled,
   onSelect,
   className,
-}: SuggestionCarouselProps) {
+}: SuggestionChipsProps) {
   return (
     <div
       className={cn(

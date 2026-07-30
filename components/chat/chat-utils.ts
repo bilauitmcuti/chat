@@ -1,6 +1,13 @@
 import { CHAT_MAX_HISTORY_CONTENT_LENGTH, CHAT_MAX_MESSAGE_LENGTH } from "@/lib/chat/limits";
 export { CHAT_TURNSTILE_COOKIE } from "@/lib/chat/parse-request";
-import { CHAT_RATE_LIMIT_MESSAGE, CHAT_TIMEOUT_MESSAGE, resolveChatErrorMessage } from "@/lib/chat/user-messages";
+import {
+  CHAT_ACCESS_BLOCKED_MESSAGE,
+  CHAT_NETWORK_ERROR_MESSAGE,
+  CHAT_RATE_LIMIT_MESSAGE,
+  CHAT_SERVER_ERROR_MESSAGE,
+  CHAT_TIMEOUT_MESSAGE,
+  resolveChatErrorMessage,
+} from "@/lib/chat/user-messages";
 export {
   consumeChatStream,
   createMarkdownStreamPainter,
@@ -9,14 +16,21 @@ export {
   createRafReasoningStreamPainter,
 } from "@/lib/chat/sse";
 export type { ChatStreamDonePayload } from "@/lib/chat/sse";
-export { CHAT_RATE_LIMIT_MESSAGE, CHAT_TIMEOUT_MESSAGE, resolveChatErrorMessage };
+export {
+  CHAT_ACCESS_BLOCKED_MESSAGE,
+  CHAT_MODEL_ERROR_MESSAGE,
+  CHAT_NETWORK_ERROR_MESSAGE,
+  CHAT_RATE_LIMIT_MESSAGE,
+  CHAT_TIMEOUT_MESSAGE,
+  resolveChatErrorMessage,
+} from "@/lib/chat/user-messages";
 
 export function getChatErrorMessage(res: Response, fallback: string): string {
   if (res.status === 429) return CHAT_RATE_LIMIT_MESSAGE;
-  if (res.status === 403) return "Access was blocked. Please refresh and try again.";
+  if (res.status === 403) return CHAT_ACCESS_BLOCKED_MESSAGE;
   if (res.status === 504) return CHAT_TIMEOUT_MESSAGE;
-  if (res.status >= 500) return "Server is temporarily unavailable. Please try again in a moment.";
-  return fallback;
+  if (res.status >= 500) return CHAT_SERVER_ERROR_MESSAGE;
+  return resolveChatErrorMessage(res.status, fallback);
 }
 
 export async function parseChatResponse(res: Response): Promise<{

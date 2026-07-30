@@ -1,4 +1,5 @@
 import { messageAsksNextUpcomingEvent } from "@/lib/chat/topic-router";
+import { messageLooksLikeExplanationOrOpinion } from "@/lib/chat/response-format";
 import type { AgentTurnContext, ChatToolName } from "@/lib/chat/agent/types";
 
 /**
@@ -28,22 +29,15 @@ export function buildToolRegistryForTurn(ctx: AgentTurnContext): ChatToolName[] 
     tools.add("get_public_holidays");
   }
 
-  if (topics.includes("uitm_general")) {
+  if (
+    topics.includes("uitm_general") ||
+    messageLooksLikeExplanationOrOpinion(ctx.message)
+  ) {
     tools.add("search_uitm_knowledge");
   }
 
   if (ctx.activityMatches.length > 0) {
     tools.add("search_calendar_activities");
-  }
-
-  const hasUitmScope =
-    topics.includes("academic_calendar") ||
-    topics.includes("lecture_weeks") ||
-    topics.includes("public_holiday") ||
-    topics.includes("uitm_general");
-
-  if (hasUitmScope && !tools.has("search_uitm_knowledge")) {
-    tools.add("search_uitm_knowledge");
   }
 
   if (tools.size === 0) {

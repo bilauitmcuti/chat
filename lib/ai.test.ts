@@ -4,6 +4,7 @@ import {
   CHAT_MODEL_LLAMA_32,
   CHAT_MODEL_LLAMA_4_SCOUT,
   CHAT_MODEL_MISTRAL_SMALL,
+  CHAT_MODEL_GLM_47_FLASH,
   CHAT_MODELS,
   DEFAULT_CHAT_MODEL,
   getModelMaxOutputTokens,
@@ -34,7 +35,7 @@ describe("resolveChatModel", () => {
   it("uses allowlisted client model when provided", () => {
     expect(resolveChatModel(CHAT_MODEL_LLAMA_4_SCOUT)).toBe(CHAT_MODEL_LLAMA_4_SCOUT);
     expect(resolveChatModel(CHAT_MODEL_MISTRAL_SMALL)).toBe(CHAT_MODEL_MISTRAL_SMALL);
-    expect(resolveChatModel("@cf/moonshotai/kimi-k2.6")).toBe("@cf/moonshotai/kimi-k2.6");
+    expect(resolveChatModel(CHAT_MODEL_GLM_47_FLASH)).toBe(CHAT_MODEL_GLM_47_FLASH);
   });
 
   it("falls back to default for unknown model ids", () => {
@@ -66,7 +67,7 @@ describe("isAllowedChatModel", () => {
     expect(isAllowedChatModel(CHAT_MODEL_GEMMA_4)).toBe(true);
     expect(isAllowedChatModel(CHAT_MODEL_LLAMA_4_SCOUT)).toBe(true);
     expect(isAllowedChatModel(CHAT_MODEL_MISTRAL_SMALL)).toBe(true);
-    expect(isAllowedChatModel("@cf/zai-org/glm-5.2")).toBe(true);
+    expect(isAllowedChatModel(CHAT_MODEL_GLM_47_FLASH)).toBe(true);
     expect(isAllowedChatModel("invalid")).toBe(false);
   });
 
@@ -99,6 +100,11 @@ describe("getVisibleChatModels / isNonProductionChatHost", () => {
       expect(model.description.trim().length).toBeGreaterThan(0);
     }
   });
+
+  it("orders picker models by provider A-Z", () => {
+    const providers = getVisibleChatModels().map((m) => m.provider);
+    expect(providers).toEqual([...providers].sort((a, b) => a.localeCompare(b)));
+  });
 });
 
 describe("getModelMaxOutputTokens", () => {
@@ -108,10 +114,9 @@ describe("getModelMaxOutputTokens", () => {
     expect(getModelMaxOutputTokens(CHAT_MODEL_MISTRAL_SMALL)).toBe(8192);
   });
 
-  it("applies per-model ceilings", () => {
-    expect(getModelMaxOutputTokens("@cf/moonshotai/kimi-k2.6")).toBe(4096);
-    expect(getModelMaxOutputTokens("@cf/zai-org/glm-5.2")).toBe(4096);
-    expect(getModelMaxOutputTokens("@cf/nvidia/nemotron-3-120b-a12b")).toBe(4096);
+  it("applies the global ceiling when models have no per-model cap", () => {
+    expect(getModelMaxOutputTokens(CHAT_MODEL_GLM_47_FLASH)).toBe(8192);
+    expect(getModelMaxOutputTokens("@cf/nvidia/nemotron-3-120b-a12b")).toBe(8192);
   });
 
   it("falls back to the global ceiling for unknown model ids", () => {
@@ -125,8 +130,7 @@ describe("supportsFunctionCalling", () => {
     expect(supportsFunctionCalling(CHAT_MODEL_GEMMA_4)).toBe(true);
     expect(supportsFunctionCalling(CHAT_MODEL_LLAMA_4_SCOUT)).toBe(true);
     expect(supportsFunctionCalling(CHAT_MODEL_MISTRAL_SMALL)).toBe(true);
-    expect(supportsFunctionCalling("@cf/moonshotai/kimi-k2.6")).toBe(true);
-    expect(supportsFunctionCalling("@cf/zai-org/glm-5.2")).toBe(true);
+    expect(supportsFunctionCalling(CHAT_MODEL_GLM_47_FLASH)).toBe(true);
     expect(supportsFunctionCalling("@cf/nvidia/nemotron-3-120b-a12b")).toBe(true);
   });
 
@@ -141,7 +145,7 @@ describe("supportsReasoningUi", () => {
     expect(supportsReasoningUi(CHAT_MODEL_GEMMA_4)).toBe(true);
     expect(supportsReasoningUi("@cf/google/gemma-3-12b-it")).toBe(true);
     expect(supportsReasoningUi("google/gemini-2.0-flash")).toBe(true);
-    expect(supportsReasoningUi("@cf/moonshotai/kimi-k2.6")).toBe(true);
+    expect(supportsReasoningUi(CHAT_MODEL_GLM_47_FLASH)).toBe(true);
   });
 
   it("disables reasoning UI for Scout and Mistral Small", () => {

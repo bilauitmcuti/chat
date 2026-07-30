@@ -88,6 +88,7 @@ import { buildPublicHolidayChatContext } from "@/lib/chat/public-holiday-context
 import {
   getCalendarUnderstandingDirective,
   getCompletionInstruction,
+  getMinimalChitchatInstruction,
   isComparisonQuestion,
   isMinimalConversationalMessage,
   isSimpleCalendarQuestion,
@@ -118,13 +119,18 @@ import { getTodayISO, toPromptDate } from "@/lib/chat/dates";
 import { encodeSseEvent, SSE_HEADERS } from "@/lib/chat/sse";
 import { mapChatError } from "@/lib/chat/map-error";
 import { trimHistoryForModel } from "@/lib/chat/history-for-model";
+import {
+  CHAT_EMPTY_REPLY_FALLBACK,
+  CHAT_TIMEOUT_MESSAGE,
+  isEmptyModelReplyError,
+} from "@/lib/chat/user-messages";
 
-/** Soft deadline for compact / single-stream turns (under Pages Edge limits). */
-const CHAT_SERVER_DEADLINE_MS = 22_000;
-/** Longer budget for rare tool-agent fallback turns. */
-const CHAT_AGENT_DEADLINE_MS = 28_000;
+/** Soft deadline for single_stream turns (under Workers ~30s wall; I/O-bound AI). */
+const CHAT_SERVER_DEADLINE_MS = 28_000;
+/** Slightly longer budget for rare tool-agent turns. */
+const CHAT_AGENT_DEADLINE_MS = 30_000;
 /** Skip date/incomplete retries when the turn already consumed this much time. */
-const RETRY_BUDGET_SKIP_MS = 18_000;
+const RETRY_BUDGET_SKIP_MS = 24_000;
 
 const AGENT_CALENDAR_TOOLS = new Set([
   "search_calendar_activities",
@@ -150,9 +156,8 @@ export interface ChatExecutionModeInput {
 }
 
 /**
- * Production Gemma (`isAgentToolsPath`) uses the tool agent for uitm_general and
- * other complex turns. Matched activities, simple date questions, and pure
- * calendar/holiday topics short-circuit to single_stream.
+ * FC models may use the tool agent unless preferSingleStream short-circuits
+ * (matched, simple, calendar-only, uitm_general, or unrouted topics).
  */
 export function resolveChatExecutionMode(
   input: ChatExecutionModeInput
@@ -162,9 +167,17 @@ export function resolveChatExecutionMode(
   return "agent";
 }
 
+/** Soft deadline for a chat turn — same for every picker model. */
+export function getChatTurnDeadlineMs(executionMode: ChatExecutionMode): number {
+  return executionMode === "agent"
+    ? CHAT_AGENT_DEADLINE_MS
+    : CHAT_SERVER_DEADLINE_MS;
+}
+
 /**
- * Prefer one LLM call with deterministic prefetch for calendar topics.
- * Complex uitm_general turns use the agent tool loop on Gemma.
+ * Prefer one LLM call with deterministic prefetch.
+ * Hard/random uitm_general and unrouted topics stay on single_stream so
+ * non-Gemma models do not fail in the tool-agent loop.
  */
 const CALENDAR_ONLY_TOPICS = new Set<ChatTopic>([
   "academic_calendar",
@@ -183,9 +196,9 @@ export function shouldPreferSingleStream(input: {
   isComplexTurn: boolean;
 }): boolean {
   if (input.hasMatchedActivity || input.isSimple) return true;
-  if (input.topics.includes("uitm_general") && input.isComplexTurn) return false;
+  if (input.topics.includes("uitm_general")) return true;
   if (isCalendarOnlyTopics(input.topics)) return true;
-  if (input.topics.length === 0) return !input.isComplexTurn;
+  if (input.topics.length === 0) return true;
   return true;
 }
 
@@ -194,7 +207,7 @@ async function runWithServerDeadline<T>(
   task: () => Promise<T>
 ): Promise<T> {
   let timer: ReturnType<typeof setTimeout> | undefined;
-  const timeoutError = new Error("Request took too long. Please try again.");
+  const timeoutError = new Error(CHAT_TIMEOUT_MESSAGE);
   Object.assign(timeoutError, { status: 504 });
   const deadline = new Promise<never>((_, reject) => {
     timer = setTimeout(() => reject(timeoutError), deadlineMs);
@@ -370,7 +383,10 @@ export async function POST(request: NextRequest) {
     const activityMatches = matchActivitiesInMessage(sanitizedMessage, flatPool);
     const hasMatchedActivity = activityMatches.length > 0;
 
-    const topicRoute = routeChatTopics(sanitizedMessage, hasMatchedActivity);
+    const isMinimalTurn = isMinimalConversationalMessage(sanitizedMessage);
+    const topicRoute = routeChatTopics(sanitizedMessage, hasMatchedActivity, {
+      isMinimalTurn,
+    });
     const useIntentFilter = shouldUseCalendarIntentFilter(topicRoute, activityMatches.length);
 
     const sanitizedHistory: ChatMessage[] = trimHistoryForModel(
@@ -392,7 +408,6 @@ export async function POST(request: NextRequest) {
     const isSimple = isSimpleCalendarQuestion(sanitizedMessage, { hasMatchedActivity });
     const asksDetail = messageAsksDetail(sanitizedMessage);
     const needsList = messageNeedsListOrSchedule(sanitizedMessage);
-    const isMinimalTurn = isMinimalConversationalMessage(sanitizedMessage);
     const isComplexTurn =
       !isMinimalTurn &&
       isComplexReasoningTurn(
@@ -622,24 +637,32 @@ export async function POST(request: NextRequest) {
     }
 
     const maxOutputTokens = getModelMaxOutputTokens(modelId);
-    const modelBudget = getModelResponseBudget(
-      sanitizedMessage,
-      !useResearchOnly,
-      wantsTableOutput,
-      maxOutputTokens,
-      { hasMatchedActivity }
-    );
+    const modelBudget = isMinimalTurn
+      ? {
+          maxTokens: Math.min(512, maxOutputTokens),
+          temperature: 0.35,
+        }
+      : getModelResponseBudget(
+          sanitizedMessage,
+          !useResearchOnly,
+          wantsTableOutput,
+          maxOutputTokens,
+          { hasMatchedActivity }
+        );
     const languageDirective = getLanguageTurnDirective(sanitizedMessage, sanitizedHistory);
     const understandingDirective =
-      !useResearchOnly && topicRoute.topics.includes("academic_calendar")
+      !isMinimalTurn &&
+      !useResearchOnly &&
+      topicRoute.topics.includes("academic_calendar")
         ? getCalendarUnderstandingDirective(sanitizedMessage)
         : "";
 
-    const completionSuffix =
-      getCompletionInstruction(isSimple, asksDetail, needsList, hasMatchedActivity) +
-      understandingDirective +
-      publicHolidayDirective +
-      languageDirective;
+    const completionSuffix = isMinimalTurn
+      ? getMinimalChitchatInstruction() + languageDirective
+      : getCompletionInstruction(isSimple, asksDetail, needsList, hasMatchedActivity) +
+        understandingDirective +
+        publicHolidayDirective +
+        languageDirective;
 
     const systemPromptWithCompletion =
       systemPrompt + prefetchDirective + completionSuffix;
@@ -776,12 +799,48 @@ export async function POST(request: NextRequest) {
     ): Promise<string> => {
       if (agentReply.trim()) return agentReply;
       const legacyPrompt = await getLegacyFallbackPromptWithCompletion(extraSuffix);
-      if (!legacyPrompt.trim()) return agentReply;
-      logger.warn("Chat agent empty reply, using legacy context fallback", {
+      if (legacyPrompt.trim()) {
+        logger.warn("Chat agent empty reply, using legacy context fallback", {
+          correlationId,
+          toolsUsed,
+        });
+        const legacyReply = await runLegacyLlm(legacyPrompt, onToken);
+        if (legacyReply.trim()) return legacyReply;
+      }
+      logger.warn("Chat agent empty reply, using friendly fallback message", {
         correlationId,
         toolsUsed,
       });
-      return runLegacyLlm(legacyPrompt, onToken);
+      await onToken(CHAT_EMPTY_REPLY_FALLBACK);
+      return CHAT_EMPTY_REPLY_FALLBACK;
+    };
+
+    const ensureNonEmptyReply = async (
+      reply: string,
+      onToken: (token: string) => void | Promise<void>
+    ): Promise<string> => {
+      if (reply.trim()) return reply;
+      if (!useAgentTools) {
+        const legacyPrompt = await getLegacyFallbackPromptWithCompletion();
+        if (legacyPrompt.trim()) {
+          logger.warn("Chat empty reply, using legacy context fallback", {
+            correlationId,
+            executionMode,
+          });
+          try {
+            const legacyReply = await runLegacyLlm(legacyPrompt, onToken);
+            if (legacyReply.trim()) return legacyReply;
+          } catch (legacyErr) {
+            if (!isEmptyModelReplyError(legacyErr)) throw legacyErr;
+          }
+        }
+      }
+      logger.warn("Chat empty reply, using friendly fallback message", {
+        correlationId,
+        executionMode,
+      });
+      await onToken(CHAT_EMPTY_REPLY_FALLBACK);
+      return CHAT_EMPTY_REPLY_FALLBACK;
     };
 
     const runLlm = async (
@@ -797,56 +856,67 @@ export async function POST(request: NextRequest) {
       const turnStartMs = Date.now();
       let turnToolsUsed: string[] = [];
       let rawReply: string;
-      if (useAgentTools) {
-        const agentResult = await askAgentWithRetry({
-          userMessage: sanitizedMessage,
-          history: sanitizedHistory,
-          ctx: agentTurnContext,
-          modelId: modelId,
-          correlationId,
-          maxTokens: modelBudget.maxTokens,
-          temperature: modelBudget.temperature,
-          extraSystemDirectives: systemPromptWithCompletion,
-          onToken,
-          onReasoningToken: onProgress?.onReasoningToken,
-          emitTokensToClient: streamTokensToClient,
-          onToolCall: onProgress?.onToolCall,
-          onSynthesis: onProgress?.onSynthesis,
-        });
-        turnToolsUsed = agentResult.toolsUsed;
-        logger.info("Chat agent reply", {
-          correlationId,
-          agentMode,
-          executionMode,
-          toolsUsed: agentResult.toolsUsed,
-          durationMs: Date.now() - turnStartMs,
-        });
-        rawReply = await resolveAgentReplyWithFallback(
-          agentResult.reply,
-          agentResult.toolsUsed,
-          onToken
-        );
-      } else if (wantStream) {
-        rawReply = await streamAiWithRetry(
-          sanitizedMessage,
-          systemPromptWithCompletion,
-          sanitizedHistory,
-          {
-            ...modelBudget,
+      try {
+        if (useAgentTools) {
+          const agentResult = await askAgentWithRetry({
+            userMessage: sanitizedMessage,
+            history: sanitizedHistory,
+            ctx: agentTurnContext,
             modelId: modelId,
             correlationId,
+            maxTokens: modelBudget.maxTokens,
+            temperature: modelBudget.temperature,
+            extraSystemDirectives: systemPromptWithCompletion,
             onToken,
             onReasoningToken: onProgress?.onReasoningToken,
             emitTokensToClient: streamTokensToClient,
-          }
-        );
-      } else {
-        rawReply = await askAiWithRetry(
-          sanitizedMessage,
-          systemPromptWithCompletion,
-          sanitizedHistory,
-          { ...modelBudget, modelId: modelId, correlationId }
-        );
+            onToolCall: onProgress?.onToolCall,
+            onSynthesis: onProgress?.onSynthesis,
+          });
+          turnToolsUsed = agentResult.toolsUsed;
+          logger.info("Chat agent reply", {
+            correlationId,
+            agentMode,
+            executionMode,
+            toolsUsed: agentResult.toolsUsed,
+            durationMs: Date.now() - turnStartMs,
+          });
+          rawReply = await resolveAgentReplyWithFallback(
+            agentResult.reply,
+            agentResult.toolsUsed,
+            onToken
+          );
+        } else if (wantStream) {
+          rawReply = await streamAiWithRetry(
+            sanitizedMessage,
+            systemPromptWithCompletion,
+            sanitizedHistory,
+            {
+              ...modelBudget,
+              modelId: modelId,
+              correlationId,
+              onToken,
+              onReasoningToken: onProgress?.onReasoningToken,
+              emitTokensToClient: streamTokensToClient,
+            }
+          );
+        } else {
+          rawReply = await askAiWithRetry(
+            sanitizedMessage,
+            systemPromptWithCompletion,
+            sanitizedHistory,
+            { ...modelBudget, modelId: modelId, correlationId }
+          );
+        }
+
+        rawReply = await ensureNonEmptyReply(rawReply, onToken);
+      } catch (err) {
+        if (!isEmptyModelReplyError(err)) throw err;
+        logger.warn("Chat empty model error, recovering with fallback", {
+          correlationId,
+          executionMode,
+        });
+        rawReply = await ensureNonEmptyReply("", onToken);
       }
 
       if (
@@ -858,22 +928,28 @@ export async function POST(request: NextRequest) {
         replyHasUnknownCalendarDates(rawReply, allowedDates)
       ) {
         await onProgress?.onRetry?.("dates");
-        if (useAgentTools) {
-          rawReply = await runPromptRetry(DATE_VALIDATION_RETRY_NUDGE, onToken);
-        } else if (wantStream) {
-          rawReply = await streamAiWithRetry(
-            sanitizedMessage,
-            systemPromptWithCompletion + DATE_VALIDATION_RETRY_NUDGE,
-            sanitizedHistory,
-            { ...modelBudget, modelId: modelId, correlationId, onToken, emitTokensToClient: streamTokensToClient }
-          );
-        } else {
-          rawReply = await askAiWithRetry(
-            sanitizedMessage,
-            systemPromptWithCompletion + DATE_VALIDATION_RETRY_NUDGE,
-            sanitizedHistory,
-            { ...modelBudget, modelId: modelId, correlationId }
-          );
+        try {
+          if (useAgentTools) {
+            rawReply = await runPromptRetry(DATE_VALIDATION_RETRY_NUDGE, onToken);
+          } else if (wantStream) {
+            rawReply = await streamAiWithRetry(
+              sanitizedMessage,
+              systemPromptWithCompletion + DATE_VALIDATION_RETRY_NUDGE,
+              sanitizedHistory,
+              { ...modelBudget, modelId: modelId, correlationId, onToken, emitTokensToClient: streamTokensToClient }
+            );
+          } else {
+            rawReply = await askAiWithRetry(
+              sanitizedMessage,
+              systemPromptWithCompletion + DATE_VALIDATION_RETRY_NUDGE,
+              sanitizedHistory,
+              { ...modelBudget, modelId: modelId, correlationId }
+            );
+          }
+          rawReply = await ensureNonEmptyReply(rawReply, onToken);
+        } catch (err) {
+          if (!isEmptyModelReplyError(err)) throw err;
+          rawReply = await ensureNonEmptyReply(rawReply, onToken);
         }
       }
 
@@ -887,44 +963,49 @@ export async function POST(request: NextRequest) {
           ...modelBudget,
           maxTokens: maxOutputTokens,
         };
-        let retryReply: string;
-        if (useAgentTools) {
-          retryReply = await runPromptRetry(
-            REPLY_COMPLETION_RETRY_NUDGE,
-            onToken,
-            bumpedBudget
-          );
-        } else if (wantStream) {
-          retryReply = await streamAiWithRetry(
-            sanitizedMessage,
-            systemPromptWithCompletion + REPLY_COMPLETION_RETRY_NUDGE,
-            sanitizedHistory,
-            {
-              ...bumpedBudget,
-              modelId: modelId,
-              correlationId,
+        try {
+          let retryReply: string;
+          if (useAgentTools) {
+            retryReply = await runPromptRetry(
+              REPLY_COMPLETION_RETRY_NUDGE,
               onToken,
-              emitTokensToClient: streamTokensToClient,
-            }
-          );
-        } else {
-          retryReply = await askAiWithRetry(
-            sanitizedMessage,
-            systemPromptWithCompletion + REPLY_COMPLETION_RETRY_NUDGE,
-            sanitizedHistory,
-            { ...bumpedBudget, modelId: modelId, correlationId }
-          );
-        }
-        const cleanedRetry = normalizeAssistantTables(cleanAiReply(retryReply));
-        if (cleanedRetry.length >= cleanedFirst.length) {
-          logger.info("Chat turn completed", {
-            correlationId,
-            executionMode,
-            toolsUsed: turnToolsUsed,
-            retried: "incomplete",
-            durationMs: Date.now() - turnStartMs,
-          });
-          return cleanedRetry;
+              bumpedBudget
+            );
+          } else if (wantStream) {
+            retryReply = await streamAiWithRetry(
+              sanitizedMessage,
+              systemPromptWithCompletion + REPLY_COMPLETION_RETRY_NUDGE,
+              sanitizedHistory,
+              {
+                ...bumpedBudget,
+                modelId: modelId,
+                correlationId,
+                onToken,
+                emitTokensToClient: streamTokensToClient,
+              }
+            );
+          } else {
+            retryReply = await askAiWithRetry(
+              sanitizedMessage,
+              systemPromptWithCompletion + REPLY_COMPLETION_RETRY_NUDGE,
+              sanitizedHistory,
+              { ...bumpedBudget, modelId: modelId, correlationId }
+            );
+          }
+          retryReply = await ensureNonEmptyReply(retryReply, onToken);
+          const cleanedRetry = normalizeAssistantTables(cleanAiReply(retryReply));
+          if (cleanedRetry.length >= cleanedFirst.length) {
+            logger.info("Chat turn completed", {
+              correlationId,
+              executionMode,
+              toolsUsed: turnToolsUsed,
+              retried: "incomplete",
+              durationMs: Date.now() - turnStartMs,
+            });
+            return cleanedRetry;
+          }
+        } catch (err) {
+          if (!isEmptyModelReplyError(err)) throw err;
         }
       }
 
@@ -934,12 +1015,14 @@ export async function POST(request: NextRequest) {
         toolsUsed: turnToolsUsed,
         durationMs: Date.now() - turnStartMs,
       });
-      return cleanedFirst;
+      if (cleanedFirst.trim()) return cleanedFirst;
+      await onToken(CHAT_EMPTY_REPLY_FALLBACK);
+      return CHAT_EMPTY_REPLY_FALLBACK;
     };
 
     if (streamHooks) {
       const streamedReply = await runWithServerDeadline(
-        useAgentTools ? CHAT_AGENT_DEADLINE_MS : CHAT_SERVER_DEADLINE_MS,
+        getChatTurnDeadlineMs(executionMode),
         () =>
           runLlm((token) => {
             streamHooks.onToken(token);

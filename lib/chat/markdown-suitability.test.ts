@@ -33,4 +33,14 @@ describe("contentToMarkdown", () => {
     const input = "Peperiksaan bermula 15-10-2025.";
     expect(contentToMarkdown(input)).toBe(input);
   });
+
+  it("strips MATCHED ACTIVITIES leakage while streaming", () => {
+    const input =
+      "=== MATCHED ACTIVITIES (authoritative) ===\nCuti Semester: 01-06-2026 hingga 12-07-2026.";
+    const out = contentToMarkdown(input);
+    expect(out).not.toMatch(/MATCHED\s+ACTIVITIES/i);
+    expect(out).not.toMatch(/^===/m);
+    expect(out).toContain("Cuti Semester");
+    expect(out).toContain("01-06-2026");
+  });
 });

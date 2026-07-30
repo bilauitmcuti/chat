@@ -32,8 +32,26 @@ describe("buildToolRegistryForTurn", () => {
     const tools = buildToolRegistryForTurn(baseCtx());
     expect(tools).toContain("search_calendar_activities");
     expect(tools).toContain("get_academic_calendar");
-    expect(tools).toContain("search_uitm_knowledge");
+    expect(tools).not.toContain("search_uitm_knowledge");
     expect(tools).not.toContain("get_lecture_weeks");
+  });
+
+  it("exposes uitm knowledge for uitm_general or explain questions", () => {
+    const general = buildToolRegistryForTurn(
+      baseCtx({
+        topicRoute: { topics: ["uitm_general"], hasNamedActivity: false },
+      })
+    );
+    expect(general).toContain("search_uitm_knowledge");
+
+    const explain = buildToolRegistryForTurn(
+      baseCtx({
+        message: "Kenapa minggu ulangkaji penting?",
+        topicRoute: { topics: ["lecture_weeks"], hasNamedActivity: false },
+      })
+    );
+    expect(explain).toContain("search_uitm_knowledge");
+    expect(explain).toContain("get_lecture_weeks");
   });
 
   it("exposes lecture weeks tool when topic includes lecture_weeks", () => {

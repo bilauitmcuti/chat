@@ -3,12 +3,15 @@ import { mapChatErrorForTest } from "@/lib/chat/map-error";
 import {
   CHAT_AI_UNAVAILABLE_MESSAGE,
   CHAT_EMPTY_REPLY_ERROR_MESSAGE,
+  CHAT_EMPTY_REPLY_FALLBACK,
   CHAT_MODEL_ACCESS_DENIED_MESSAGE,
   CHAT_MODEL_ERROR_MESSAGE,
   CHAT_MODEL_UNAVAILABLE_MESSAGE,
   CHAT_RATE_LIMIT_MESSAGE,
   CHAT_TIMEOUT_MESSAGE,
   CHAT_TOOL_FORMAT_ERROR_MESSAGE,
+  isEmptyModelReplyError,
+  resolveChatErrorMessage,
 } from "@/lib/chat/user-messages";
 
 describe("mapChatError", () => {
@@ -69,5 +72,38 @@ describe("mapChatError", () => {
     );
     expect(mapped.status).toBe(504);
     expect(mapped.message).toBe(CHAT_TIMEOUT_MESSAGE);
+  });
+});
+
+describe("resolveChatErrorMessage", () => {
+  it("maps common statuses", () => {
+    expect(resolveChatErrorMessage(429)).toBe(CHAT_RATE_LIMIT_MESSAGE);
+    expect(resolveChatErrorMessage(504)).toBe(CHAT_TIMEOUT_MESSAGE);
+    expect(resolveChatErrorMessage(502)).toBe(CHAT_MODEL_ERROR_MESSAGE);
+    expect(resolveChatErrorMessage(503)).toBe(CHAT_MODEL_UNAVAILABLE_MESSAGE);
+  });
+});
+
+describe("isEmptyModelReplyError", () => {
+  it("detects empty response errors", () => {
+    expect(isEmptyModelReplyError(new Error("Empty response from model"))).toBe(
+      true
+    );
+    expect(
+      isEmptyModelReplyError(new Error("Empty response from model (@cf/x)"))
+    ).toBe(true);
+    expect(isEmptyModelReplyError("empty response")).toBe(true);
+  });
+
+  it("ignores unrelated errors", () => {
+    expect(isEmptyModelReplyError(new Error("Request timed out"))).toBe(false);
+    expect(isEmptyModelReplyError(null)).toBe(false);
+  });
+});
+
+describe("CHAT_EMPTY_REPLY_FALLBACK", () => {
+  it("is a non-empty user-facing message", () => {
+    expect(CHAT_EMPTY_REPLY_FALLBACK.trim().length).toBeGreaterThan(20);
+    expect(CHAT_EMPTY_REPLY_FALLBACK.toLowerCase()).toMatch(/kalendar|uitm/);
   });
 });

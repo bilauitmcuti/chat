@@ -30,6 +30,25 @@ describe("routeChatTopics", () => {
     expect(route.topics).toContain("academic_calendar");
     expect(route.topics).toContain("public_holiday");
   });
+
+  it("routes greetings and test phrases away from academic calendar", () => {
+    expect(routeChatTopics("hi", false, { isMinimalTurn: true }).topics).toEqual(
+      []
+    );
+    expect(routeChatTopics("hey", false, { isMinimalTurn: true }).topics).toEqual(
+      []
+    );
+    expect(routeChatTopics("test", false, { isMinimalTurn: true }).topics).toEqual(
+      []
+    );
+  });
+
+  it("still defaults non-minimal ambiguous chat to academic calendar", () => {
+    const route = routeChatTopics("hello world this is longer", false, {
+      isMinimalTurn: false,
+    });
+    expect(route.topics).toContain("academic_calendar");
+  });
 });
 
 describe("messageAsksLectureWeeks", () => {

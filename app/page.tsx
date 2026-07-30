@@ -17,18 +17,19 @@ import {
   getGroupFromProgram,
   getSessionMemoryKey,
 } from "@/lib/session-memory";
-import { cn } from "@/lib/utils";
 import { trackZarazEvent, ZARAZ_EVENTS } from "@/lib/zaraz";
 import { useTurnstileSiteKeyFromContext } from "@/hooks/use-turnstile-site-key";
 import type { TurnstileWidgetHandle } from "@/components/turnstile-widget";
 import { ChatTranscript } from "@/components/chat/chat-transcript";
-import { ChatEmptyState } from "@/components/chat/chat-empty-state";
+import { ChatEmptyDesktop } from "@/components/chat/chat-empty-desktop";
+import { ChatEmptyMobile } from "@/components/chat/chat-empty-mobile";
 import { ChatComposer } from "@/components/chat/chat-composer";
 import { getRandomSuggestions } from "@/components/chat/suggestion-data";
-import { useDesktopViewport } from "@/lib/use-mobile-viewport";
+import { DESKTOP_VIEWPORT_QUERY, useDesktopViewport } from "@/lib/use-mobile-viewport";
 import {
   CHAT_TURNSTILE_COOKIE,
   CHAT_TIMEOUT_MESSAGE,
+  CHAT_NETWORK_ERROR_MESSAGE,
   resolveChatErrorMessage,
   FETCH_TIMEOUT_MS,
   FETCH_HEADERS_TIMEOUT_MS,
@@ -308,6 +309,8 @@ export default function ChatPage() {
     return opt?.label ?? "All";
   }, [selectedProgram, programOptions]);
   const textareaRef = useRef<HTMLTextAreaElement>(null);
+  const desktopTextareaRef = useRef<HTMLTextAreaElement>(null);
+  const mobileTextareaRef = useRef<HTMLTextAreaElement>(null);
   const turnstileRef = useRef<TurnstileWidgetHandle>(null);
   const groupAOptions = useMemo(() => programOptions.filter(p => p.group === 'A'), [programOptions]);
   const groupBOptions = useMemo(() => programOptions.filter(p => p.group === 'B'), [programOptions]);
@@ -765,7 +768,7 @@ export default function ChatPage() {
           const isAbort = err instanceof Error && err.name === "AbortError";
           content = isAbort
             ? CHAT_TIMEOUT_MESSAGE
-            : "Something went wrong. Please try again.";
+            : CHAT_NETWORK_ERROR_MESSAGE;
           if (
             isAbort &&
             lastErrorStatus === 429
@@ -1030,6 +1033,23 @@ export default function ChatPage() {
 
   const isEmptyChat = messages.length === 0;
 
+  useLayoutEffect(() => {
+    if (!isEmptyChat) return;
+    const syncActiveEmptyTextarea = () => {
+      const isDesktop = window.matchMedia(DESKTOP_VIEWPORT_QUERY).matches;
+      textareaRef.current = isDesktop
+        ? desktopTextareaRef.current
+        : mobileTextareaRef.current;
+      if (isDesktop) {
+        desktopTextareaRef.current?.focus({ preventScroll: true });
+      }
+    };
+    syncActiveEmptyTextarea();
+    const mql = window.matchMedia(DESKTOP_VIEWPORT_QUERY);
+    mql.addEventListener("change", syncActiveEmptyTextarea);
+    return () => mql.removeEventListener("change", syncActiveEmptyTextarea);
+  }, [isEmptyChat]);
+
   const chatInputPlaceholder = useMemo(() => {
     if (!isEmptyChat) return "Write a message...";
     if (isDesktopViewport) {
@@ -1038,94 +1058,126 @@ export default function ChatPage() {
     return "How can I help you today?";
   }, [isEmptyChat, isDesktopViewport]);
 
+  const suggestionsDisabled =
+    waitForTurnstileConfig ||
+    (requiresTurnstile && !turnstileToken.trim()) ||
+    isLoading;
+
+  const composerFormProps = {
+    input,
+    placeholder: chatInputPlaceholder,
+    isLoading,
+    waitForTurnstileConfig,
+    requiresTurnstile,
+    turnstileToken,
+    feedbackError,
+    mentionHighlightParts,
+    isMentionOpen,
+    isMobileMentionPicker,
+    mentionItems,
+    activeMentionIndex,
+    dropdownOpen,
+    activeSubmenu,
+    currentProgramLabel,
+    groupAOptions,
+    groupBOptions,
+    groupBProgramForSessions,
+    groupBSessionLabel,
+    selectedProgram,
+    selectedSessions,
+    keepDropdownOpenRef,
+    onInputChange: (value: string, caretIndex: number | null) => {
+      setInput(value);
+      updateMentionState(value, caretIndex);
+    },
+    onKeyDown: handleKeyDown,
+    onSubmit: handleSubmit,
+    onMentionSelect: handleMentionSelect,
+    onMentionOpenChange: setIsMentionOpen,
+    onDropdownOpenChange: setDropdownOpen,
+    onActiveSubmenuChange: setActiveSubmenu,
+    onSessionToggle: handleSessionToggle,
+    onProgramSelect: handleProgramSelect,
+    formatGroupASessionTriggerLabel,
+    chatModels,
+    selectedModelId,
+    selectedModelLabel,
+    modelDropdownOpen,
+    onModelDropdownOpenChange: setModelDropdownOpen,
+    onModelSelect: handleModelSelect,
+  };
+
   return (
     <div className="relative flex h-dvh flex-col overflow-hidden bg-background text-foreground" data-nosnippet>
-      {/* Header - overlays on top of chat area */}
-      {/* Chat area + composer */}
-      <div
-        className={cn(
-          "flex min-h-0 min-w-0 flex-1 flex-col overflow-hidden px-1 md:px-0",
-          isEmptyChat && "lg:justify-center lg:gap-8"
-        )}
-      >
+      <div className="flex min-h-0 min-w-0 flex-1 flex-col overflow-hidden px-1 md:px-0">
         {isEmptyChat ? (
-          <ChatEmptyState
-            showTurnstileChallenge={showTurnstileChallenge}
-            turnstileSiteKey={turnstileSiteKey ?? ""}
-            turnstileNonce={turnstileNonce}
-            turnstileRef={turnstileRef}
-            onTurnstileToken={setTurnstileToken}
-          />
+          <>
+            <ChatEmptyDesktop
+              showTurnstileChallenge={showTurnstileChallenge && isDesktopViewport}
+              turnstileSiteKey={turnstileSiteKey ?? ""}
+              turnstileNonce={turnstileNonce}
+              turnstileRef={turnstileRef}
+              onTurnstileToken={setTurnstileToken}
+              suggestions={suggestions}
+              suggestionsDisabled={suggestionsDisabled}
+              onSuggestionSelect={sendMessage}
+              composer={{
+                ...composerFormProps,
+                textareaRef: desktopTextareaRef,
+                placeholder:
+                  "Ask about calendars or holidays. Select your programme, or type @ to mention one.",
+                // Only the visible shell owns open menus — portals from the hidden twin would duplicate.
+                dropdownOpen: isDesktopViewport ? dropdownOpen : false,
+                modelDropdownOpen: isDesktopViewport ? modelDropdownOpen : false,
+                activeSubmenu: isDesktopViewport ? activeSubmenu : null,
+                isMentionOpen: isDesktopViewport ? isMentionOpen : false,
+              }}
+            />
+            <ChatEmptyMobile
+              showTurnstileChallenge={showTurnstileChallenge && !isDesktopViewport}
+              turnstileSiteKey={turnstileSiteKey ?? ""}
+              turnstileNonce={turnstileNonce}
+              turnstileRef={turnstileRef}
+              onTurnstileToken={setTurnstileToken}
+              suggestions={suggestions}
+              suggestionsDisabled={suggestionsDisabled}
+              onSuggestionSelect={sendMessage}
+              composer={{
+                ...composerFormProps,
+                textareaRef: mobileTextareaRef,
+                placeholder: "How can I help you today?",
+                dropdownOpen: !isDesktopViewport ? dropdownOpen : false,
+                modelDropdownOpen: !isDesktopViewport ? modelDropdownOpen : false,
+                activeSubmenu: !isDesktopViewport ? activeSubmenu : null,
+                isMentionOpen: !isDesktopViewport ? isMentionOpen : false,
+              }}
+            />
+          </>
         ) : (
-          <ChatTranscript
-            messages={messages}
-            streamingDraft={streamingDraft}
-            isLoading={isLoading}
-            showLoadingMarker={showLoadingMarker}
-            streamStatusPhrase={streamStatusPhrase}
-            lastUserMsgId={lastUserMsgId}
-            copiedId={copiedId}
-            reactions={reactions}
-            showTurnstileChallenge={showTurnstileChallenge}
-            turnstileSiteKey={turnstileSiteKey ?? ""}
-            turnstileNonce={turnstileNonce}
-            turnstileRef={turnstileRef}
-            onTurnstileToken={setTurnstileToken}
-            onViewportScroll={handleViewportScroll}
-            onCopy={handleCopy}
-            onReaction={handleReaction}
-            onEdit={handleEdit}
-            onDelete={handleDelete}
-          />
+          <>
+            <ChatTranscript
+              messages={messages}
+              streamingDraft={streamingDraft}
+              isLoading={isLoading}
+              showLoadingMarker={showLoadingMarker}
+              streamStatusPhrase={streamStatusPhrase}
+              lastUserMsgId={lastUserMsgId}
+              copiedId={copiedId}
+              reactions={reactions}
+              showTurnstileChallenge={showTurnstileChallenge}
+              turnstileSiteKey={turnstileSiteKey ?? ""}
+              turnstileNonce={turnstileNonce}
+              turnstileRef={turnstileRef}
+              onTurnstileToken={setTurnstileToken}
+              onViewportScroll={handleViewportScroll}
+              onCopy={handleCopy}
+              onReaction={handleReaction}
+              onEdit={handleEdit}
+              onDelete={handleDelete}
+            />
+            <ChatComposer {...composerFormProps} textareaRef={textareaRef} />
+          </>
         )}
-
-        <ChatComposer
-          isEmptyChat={isEmptyChat}
-          input={input}
-          placeholder={chatInputPlaceholder}
-          isLoading={isLoading}
-          waitForTurnstileConfig={waitForTurnstileConfig}
-          requiresTurnstile={requiresTurnstile}
-          turnstileToken={turnstileToken}
-          feedbackError={feedbackError}
-          suggestions={suggestions}
-          mentionHighlightParts={mentionHighlightParts}
-          isMentionOpen={isMentionOpen}
-          isMobileMentionPicker={isMobileMentionPicker}
-          mentionItems={mentionItems}
-          activeMentionIndex={activeMentionIndex}
-          dropdownOpen={dropdownOpen}
-          activeSubmenu={activeSubmenu}
-          currentProgramLabel={currentProgramLabel}
-          groupAOptions={groupAOptions}
-          groupBOptions={groupBOptions}
-          groupBProgramForSessions={groupBProgramForSessions}
-          groupBSessionLabel={groupBSessionLabel}
-          selectedProgram={selectedProgram}
-          selectedSessions={selectedSessions}
-          textareaRef={textareaRef}
-          keepDropdownOpenRef={keepDropdownOpenRef}
-          onInputChange={(value, caretIndex) => {
-            setInput(value);
-            updateMentionState(value, caretIndex);
-          }}
-          onKeyDown={handleKeyDown}
-          onSubmit={handleSubmit}
-          onSuggestionSelect={sendMessage}
-          onMentionSelect={handleMentionSelect}
-          onMentionOpenChange={setIsMentionOpen}
-          onDropdownOpenChange={setDropdownOpen}
-          onActiveSubmenuChange={setActiveSubmenu}
-          onSessionToggle={handleSessionToggle}
-          onProgramSelect={handleProgramSelect}
-          formatGroupASessionTriggerLabel={formatGroupASessionTriggerLabel}
-          chatModels={chatModels}
-          selectedModelId={selectedModelId}
-          selectedModelLabel={selectedModelLabel}
-          modelDropdownOpen={modelDropdownOpen}
-          onModelDropdownOpenChange={setModelDropdownOpen}
-          onModelSelect={handleModelSelect}
-        />
       </div>
     </div>
   );

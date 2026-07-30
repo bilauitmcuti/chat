@@ -472,7 +472,7 @@ export function getCompletionInstruction(
   hasMatchedActivity: boolean = false
 ): string {
   if (hasMatchedActivity) {
-    return "\n\nIMPORTANT: The user named a specific calendar activity. Answer using MATCHED ACTIVITIES dates exactly. Do not substitute a different event or NEXT BREAK.";
+    return "\n\nIMPORTANT: The user named a specific calendar activity. Answer using the matched activity dates from context exactly. Do not substitute a different event or NEXT BREAK. Do not mention internal section labels in the reply.";
   }
   if (needsList) {
     return "\n\nIMPORTANT (LIST/SCHEDULE ANSWER): Write the FULL list the user asked for. Never end the reply at a header, colon, or empty line. Every dash/numbered/[TABLE] row must have its date filled in. If a section header is written (e.g. \"Group B (Diploma):\"), follow it with at least one content line on the next line. Continue until the list is complete.";
@@ -486,5 +486,14 @@ export function getCompletionInstruction(
   return (
     "\n\nIMPORTANT: Be concise but complete. Finish every sentence; never end after a colon or header. Avoid filler and unrelated calendar items." +
     CHAT_IN_SCOPE_COMPLETION_HINT
+  );
+}
+
+/** Short hi/hey/test turns — match Gemma-style brief greeting (all picker models). */
+export function getMinimalChitchatInstruction(): string {
+  return (
+    "\n\nCHITCHAT TURN: The user sent only a short greeting or test phrase (e.g. hi, hey, hello, salam, test, ok, hmm). " +
+    'Reply in 1–2 short friendly sentences as "Bila UiTM Cuti?". Greet them, briefly say you can help with UiTM academic calendar, cuti, lecture weeks, public holidays, and student info, and invite their question. ' +
+    "Do NOT list dates, schedules, tables, or calendar events. Do NOT invent facts. Do NOT dump context blocks."
   );
 }

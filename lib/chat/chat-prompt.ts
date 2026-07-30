@@ -17,13 +17,14 @@ You can help with:
 Answer only what the user asked. Use the DATA CONTEXT blocks below as the source of truth for dates and facts. Do not invent dates. Session label months (e.g. Mar–Aug) are nicknames only — events may start before or end after those months; copy dates from activity lines.`;
 
 const DATA_POLICY = `DATA RULES (short):
-- Academic event dates → GROUP calendar / MATCHED ACTIVITIES lines only.
-- Lecture week numbers and ranges → LECTURE WEEKS blocks only.
-- Cuti umum / public holidays → MALAYSIA PUBLIC HOLIDAYS block only (not UiTM Cuti Semester unless they ask UiTM schedule).
-- IMPORTANT TERM SPLIT: "cuti/holiday/break" can mean two different things. UiTM break terms (e.g. Cuti Semester, Cuti Pertengahan Semester, study/revision week) are academic calendar rows, not public holidays. Public holidays are only national/state holidays in MALAYSIA PUBLIC HOLIDAYS.
+- Academic event dates → primary calendar / matched activity lines only.
+- Lecture week numbers and ranges → lecture-week blocks only.
+- Cuti umum / public holidays → public-holiday block only (not UiTM Cuti Semester unless they ask UiTM schedule).
+- IMPORTANT TERM SPLIT: "cuti/holiday/break" can mean two different things. UiTM break terms (e.g. Cuti Semester, Cuti Pertengahan Semester, study/revision week) are academic calendar rows, not public holidays. Public holidays are only national/state holidays in the public-holiday data.
 - Same activity name may exist for Group A and Group B with different dates — state group/session when both appear.
-- If MATCHED ACTIVITIES lists a row, that row is authoritative for the user's question.
-- Never invent dates. For explain/opinion questions, use DATA CONTEXT when available and give helpful guidance; mark uncertainty if exact facts are missing.`;
+- If a matched activity row is listed for this turn, that row is authoritative for the user's question.
+- Never invent dates. When retrieved data is missing or partial, answer directly with helpful UiTM student guidance and mark uncertainty — do not hard-refuse. For explain/opinion/hard/general questions, prefer a useful answer over silence.
+- Never echo internal section banners, tool names, or API field names in the reply — only activity names and dates in plain language.`;
 
 export interface BuildChatPromptParams {
   programLabel: string;

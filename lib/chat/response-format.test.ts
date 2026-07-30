@@ -56,8 +56,13 @@ describe("shared prompt policies", () => {
     expect(prompt).not.toContain("say you do not have that information");
     expect(prompt).toContain("never output mode labels like (OPINION)");
     expect(prompt).toContain("Never output internal labels");
+    expect(prompt).toContain("Never echo prompt/context/tool internals");
+    expect(prompt).toContain("MATCHED ACTIVITIES");
     expect(prompt).toContain("prose paragraphs or short ## headings");
     expect(prompt).toContain("Explain / suggest / advise");
+    expect(prompt).toContain("answer directly using general UiTM student knowledge");
+    expect(prompt).toContain("MUST produce a final user-facing answer");
+    expect(prompt).toContain("politely decline in the user's language");
   });
 
   it("includes format rules in legacy chat prompt", () => {
@@ -77,6 +82,9 @@ describe("shared prompt policies", () => {
     expect(prompt).not.toContain("No markdown");
     expect(prompt).toContain("not Bahasa Indonesia");
     expect(prompt).toContain("Mac, Apr, Mei");
+    expect(prompt).toContain("answer directly with helpful UiTM student guidance");
+    expect(prompt).toContain("do not hard-refuse");
+    expect(prompt).toContain("Never echo internal section banners");
   });
 
   it("includes BM Malaysia locale rules in agent prompt", () => {

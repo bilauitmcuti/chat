@@ -173,11 +173,17 @@ export function messageAsksAcademicCalendar(message: string): boolean {
 /**
  * Route a user message to one or more topics. Default for ambiguous UiTM chat
  * is academic calendar when program/session context exists.
+ * Minimal chitchat (hi/hey/test) gets no calendar topic so models do not dump schedules.
  */
 export function routeChatTopics(
   message: string,
-  hasNamedActivity: boolean
+  hasNamedActivity: boolean,
+  options?: { isMinimalTurn?: boolean }
 ): TopicRouteResult {
+  if (options?.isMinimalTurn === true && !hasNamedActivity) {
+    return { topics: [], hasNamedActivity: false };
+  }
+
   const topics = new Set<ChatTopic>();
 
   const wantsLecture = messageAsksLectureWeeks(message);

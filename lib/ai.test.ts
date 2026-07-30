@@ -4,7 +4,6 @@ import {
   CHAT_MODEL_LLAMA_32,
   CHAT_MODEL_LLAMA_4_SCOUT,
   CHAT_MODEL_MISTRAL_SMALL,
-  CHAT_MODEL_GLM_47_FLASH,
   CHAT_MODELS,
   DEFAULT_CHAT_MODEL,
   getModelMaxOutputTokens,
@@ -20,6 +19,9 @@ import {
   shouldStreamTokensToClient,
   supportsFunctionCalling,
   buildDynamicRouteCompatQuery,
+  normalizeMessagesToOpenAiCompat,
+  runAiWithGateway,
+  isModelFallbackError,
 } from "@/lib/ai";
 
 describe("resolveChatModel", () => {
@@ -36,7 +38,6 @@ describe("resolveChatModel", () => {
   it("uses allowlisted client model when provided", () => {
     expect(resolveChatModel(CHAT_MODEL_LLAMA_4_SCOUT)).toBe(CHAT_MODEL_LLAMA_4_SCOUT);
     expect(resolveChatModel(CHAT_MODEL_MISTRAL_SMALL)).toBe(CHAT_MODEL_MISTRAL_SMALL);
-    expect(resolveChatModel(CHAT_MODEL_GLM_47_FLASH)).toBe(CHAT_MODEL_GLM_47_FLASH);
   });
 
   it("falls back to default for unknown model ids", () => {
@@ -68,7 +69,7 @@ describe("isAllowedChatModel", () => {
     expect(isAllowedChatModel(CHAT_MODEL_GEMMA_4)).toBe(true);
     expect(isAllowedChatModel(CHAT_MODEL_LLAMA_4_SCOUT)).toBe(true);
     expect(isAllowedChatModel(CHAT_MODEL_MISTRAL_SMALL)).toBe(true);
-    expect(isAllowedChatModel(CHAT_MODEL_GLM_47_FLASH)).toBe(true);
+    expect(isAllowedChatModel("@cf/nvidia/nemotron-3-120b-a12b")).toBe(true);
     expect(isAllowedChatModel("invalid")).toBe(false);
   });
 
@@ -118,7 +119,6 @@ describe("getModelMaxOutputTokens", () => {
   });
 
   it("applies the global ceiling when models have no per-model cap", () => {
-    expect(getModelMaxOutputTokens(CHAT_MODEL_GLM_47_FLASH)).toBe(8192);
     expect(getModelMaxOutputTokens("@cf/nvidia/nemotron-3-120b-a12b")).toBe(8192);
   });
 
@@ -133,7 +133,6 @@ describe("supportsFunctionCalling", () => {
     expect(supportsFunctionCalling(CHAT_MODEL_GEMMA_4)).toBe(true);
     expect(supportsFunctionCalling(CHAT_MODEL_LLAMA_4_SCOUT)).toBe(true);
     expect(supportsFunctionCalling(CHAT_MODEL_MISTRAL_SMALL)).toBe(true);
-    expect(supportsFunctionCalling(CHAT_MODEL_GLM_47_FLASH)).toBe(true);
     expect(supportsFunctionCalling("@cf/nvidia/nemotron-3-120b-a12b")).toBe(true);
   });
 
@@ -148,7 +147,7 @@ describe("supportsReasoningUi", () => {
     expect(supportsReasoningUi(CHAT_MODEL_GEMMA_4)).toBe(true);
     expect(supportsReasoningUi("@cf/google/gemma-3-12b-it")).toBe(true);
     expect(supportsReasoningUi("google/gemini-2.0-flash")).toBe(true);
-    expect(supportsReasoningUi(CHAT_MODEL_GLM_47_FLASH)).toBe(true);
+    expect(supportsReasoningUi("@cf/nvidia/nemotron-3-120b-a12b")).toBe(true);
   });
 
   it("disables reasoning UI for Scout and Mistral Small", () => {
@@ -199,5 +198,159 @@ describe("buildDynamicRouteCompatQuery", () => {
         },
       ],
     });
+  });
+
+  it("normalizes flat assistant tool_calls to OpenAI shape", () => {
+    const query = buildDynamicRouteCompatQuery("dynamic/llama-scout", {
+      messages: [
+        {
+          role: "assistant",
+          content: "",
+          tool_calls: [
+            { name: "search", arguments: { query: "cuti" }, id: "c1" },
+          ],
+        },
+        { role: "tool", name: "search", content: "[]" },
+      ],
+    });
+    expect(query.messages).toEqual([
+      {
+        role: "assistant",
+        content: "",
+        tool_calls: [
+          {
+            id: "c1",
+            type: "function",
+            function: { name: "search", arguments: '{"query":"cuti"}' },
+          },
+        ],
+      },
+      { role: "tool", tool_call_id: "call_search", content: "[]" },
+    ]);
+  });
+});
+
+describe("normalizeMessagesToOpenAiCompat", () => {
+  it("leaves plain user messages unchanged", () => {
+    expect(
+      normalizeMessagesToOpenAiCompat([{ role: "user", content: "hi" }])
+    ).toEqual([{ role: "user", content: "hi" }]);
+  });
+});
+
+describe("runAiWithGateway resilience", () => {
+  afterEach(() => {
+    vi.unstubAllEnvs();
+  });
+
+  it("skips dynamic route by default and uses AI.run for non-Gemma", async () => {
+    vi.stubEnv("AI_GATEWAY_ID", "buc-chat");
+    vi.stubEnv("CHAT_USE_DYNAMIC_ROUTES", "");
+    const run = vi.fn().mockResolvedValue({ response: "from-run" });
+    const gatewayRun = vi.fn();
+    const ai = {
+      run,
+      gateway: () => ({ run: gatewayRun }),
+    } as unknown as Ai;
+
+    const result = await runAiWithGateway(
+      ai,
+      CHAT_MODEL_LLAMA_4_SCOUT,
+      { messages: [{ role: "user", content: "hi" }], max_tokens: 16 },
+      { skipCache: true }
+    );
+
+    expect(gatewayRun).not.toHaveBeenCalled();
+    expect(run).toHaveBeenCalledWith(
+      CHAT_MODEL_LLAMA_4_SCOUT,
+      expect.any(Object),
+      expect.objectContaining({ gateway: expect.objectContaining({ id: "buc-chat" }) })
+    );
+    expect(result).toEqual({ response: "from-run" });
+  });
+
+  it("falls back to AI.run when dynamic route throws (flag on)", async () => {
+    vi.stubEnv("AI_GATEWAY_ID", "buc-chat");
+    vi.stubEnv("CHAT_USE_DYNAMIC_ROUTES", "1");
+    const run = vi.fn().mockResolvedValue({ response: "from-run" });
+    const gatewayRun = vi.fn().mockRejectedValue(Object.assign(new Error("500"), { status: 500 }));
+    const ai = {
+      run,
+      gateway: () => ({ run: gatewayRun }),
+    } as unknown as Ai;
+
+    const result = await runAiWithGateway(
+      ai,
+      CHAT_MODEL_LLAMA_4_SCOUT,
+      { messages: [{ role: "user", content: "hi" }], max_tokens: 16 },
+      { skipCache: true }
+    );
+
+    expect(gatewayRun).toHaveBeenCalled();
+    expect(run).toHaveBeenCalledWith(
+      CHAT_MODEL_LLAMA_4_SCOUT,
+      expect.any(Object),
+      expect.objectContaining({ gateway: expect.objectContaining({ id: "buc-chat" }) })
+    );
+    expect(result).toEqual({ response: "from-run" });
+  });
+
+  it("falls back to Gemma when primary AI.run hits a fallback-worthy error", async () => {
+    vi.stubEnv("AI_GATEWAY_ID", "buc-chat");
+    vi.stubEnv("CHAT_USE_DYNAMIC_ROUTES", "");
+    const primaryErr = Object.assign(new Error("model unavailable 503"), {
+      status: 503,
+    });
+    expect(isModelFallbackError(primaryErr)).toBe(true);
+
+    const run = vi
+      .fn()
+      .mockRejectedValueOnce(primaryErr)
+      .mockResolvedValueOnce({ response: "from-gemma" });
+    const gatewayRun = vi.fn();
+    const ai = {
+      run,
+      gateway: () => ({ run: gatewayRun }),
+    } as unknown as Ai;
+
+    const result = await runAiWithGateway(
+      ai,
+      CHAT_MODEL_LLAMA_4_SCOUT,
+      {
+        messages: [{ role: "user", content: "hi" }],
+        max_tokens: 16,
+        tools: [{ name: "search", description: "d", parameters: { type: "object" } }],
+      },
+      { skipCache: true }
+    );
+
+    expect(gatewayRun).not.toHaveBeenCalled();
+    expect(run).toHaveBeenCalledTimes(2);
+    expect(run.mock.calls[1]?.[0]).toBe(DEFAULT_CHAT_MODEL);
+    expect(result).toEqual({ response: "from-gemma" });
+  });
+
+  it("uses AI.run only for Gemma (no dynamic route)", async () => {
+    vi.stubEnv("AI_GATEWAY_ID", "buc-chat");
+    const run = vi.fn().mockResolvedValue({ response: "gemma" });
+    const gatewayRun = vi.fn();
+    const ai = {
+      run,
+      gateway: () => ({ run: gatewayRun }),
+    } as unknown as Ai;
+
+    await runAiWithGateway(
+      ai,
+      DEFAULT_CHAT_MODEL,
+      { messages: [{ role: "user", content: "hi" }] },
+      { skipCache: true }
+    );
+
+    expect(gatewayRun).not.toHaveBeenCalled();
+    expect(run).toHaveBeenCalledWith(
+      DEFAULT_CHAT_MODEL,
+      expect.any(Object),
+      expect.anything()
+    );
   });
 });

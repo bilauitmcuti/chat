@@ -1,6 +1,5 @@
 import {
   CHAT_MODEL_GEMMA_4,
-  CHAT_MODEL_GLM_47_FLASH,
   CHAT_MODEL_LLAMA_4_SCOUT,
   CHAT_MODEL_MISTRAL_SMALL,
 } from "@/lib/chat/models";
@@ -10,7 +9,6 @@ export const DYNAMIC_ROUTE_GEMMA_4 = "gemma-4" as const;
 export const DYNAMIC_ROUTE_LLAMA_SCOUT = "llama-scout" as const;
 export const DYNAMIC_ROUTE_MISTRAL_SMALL = "mistral-small" as const;
 export const DYNAMIC_ROUTE_NEMOTRON = "nemotron" as const;
-export const DYNAMIC_ROUTE_GLM_FLASH = "glm-flash" as const;
 
 export const CHAT_MODEL_NEMOTRON = "@cf/nvidia/nemotron-3-120b-a12b" as const;
 
@@ -22,7 +20,6 @@ const DYNAMIC_ROUTE_BY_MODEL: Readonly<Record<string, string>> = {
   [CHAT_MODEL_LLAMA_4_SCOUT]: DYNAMIC_ROUTE_LLAMA_SCOUT,
   [CHAT_MODEL_MISTRAL_SMALL]: DYNAMIC_ROUTE_MISTRAL_SMALL,
   [CHAT_MODEL_NEMOTRON]: DYNAMIC_ROUTE_NEMOTRON,
-  [CHAT_MODEL_GLM_47_FLASH]: DYNAMIC_ROUTE_GLM_FLASH,
 };
 
 /** Route names deployed on Cloudflare AI Gateway `buc-chat` (including Gemma). */
@@ -31,7 +28,6 @@ export const ALL_DYNAMIC_ROUTE_NAMES = [
   DYNAMIC_ROUTE_LLAMA_SCOUT,
   DYNAMIC_ROUTE_MISTRAL_SMALL,
   DYNAMIC_ROUTE_NEMOTRON,
-  DYNAMIC_ROUTE_GLM_FLASH,
 ] as const;
 
 /**
@@ -45,6 +41,16 @@ export function getDynamicRouteModelId(modelId: string): string | null {
   return `dynamic/${routeName}`;
 }
 
+/**
+ * Opt-in: call AI Gateway Dynamic Routes via compat.
+ * Default off — compat currently returns 400 Bad input for Workers AI models;
+ * chat uses `AI.run` + app Gemma fallback instead.
+ */
+export function isDynamicRoutingEnabled(): boolean {
+  const raw = process.env.CHAT_USE_DYNAMIC_ROUTES?.trim().toLowerCase();
+  return raw === "1" || raw === "true";
+}
+
 export function usesDynamicRoute(modelId: string): boolean {
-  return getDynamicRouteModelId(modelId) !== null;
+  return isDynamicRoutingEnabled() && getDynamicRouteModelId(modelId) !== null;
 }

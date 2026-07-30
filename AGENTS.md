@@ -15,7 +15,7 @@ npx wrangler login             # required for local Workers AI binding
 
 - **Workers AI binding** — required for chat. Declared in [`wrangler.jsonc`](wrangler.jsonc) as `ai.binding: "AI"`. No API key secret for inference. Access via `getCloudflareContext()` from `@opennextjs/cloudflare`.
   - **Default model:** Gemma 4 (`@cf/google/gemma-4-26b-a4b-it`) on all environments.
-  - **Client model picker:** users can choose from 5 Workers AI models in the chat composer (Gemma 4, Llama 4 Scout, Mistral Small 3.1, Nemotron 3 Super, GLM 4.7 Flash). See [`lib/chat/models.ts`](lib/chat/models.ts).
+  - **Client model picker:** users can choose from 4 Workers AI models in the chat composer (Gemma 4, Llama 4 Scout, Mistral Small 3.1, Nemotron 3 Super). See [`lib/chat/models.ts`](lib/chat/models.ts).
   - Optional server default override: `WORKERS_AI_MODEL` (must be an allowlisted model id).
 - `NEXT_PUBLIC_TURNSTILE_SITE_KEY` + `TURNSTILE_SECRET_KEY` — required for Turnstile on chat in production. Set `NEXT_PUBLIC_TURNSTILE_SITE_KEY` in build env, or `TURNSTILE_SITE_KEY` at runtime (client loads via `GET /chat/api/turnstile/config`).
 
@@ -26,6 +26,7 @@ npx wrangler login             # required for local Workers AI binding
 - `CHAT_USE_AGENT` — set to `0` or `false` to disable tool-calling agent globally. See [`lib/chat/agent/run-agent.ts`](lib/chat/agent/run-agent.ts).
 - `AI_GATEWAY_ID` — AI Gateway name (default / production: `buc-chat`). Declared in [`wrangler.jsonc`](wrangler.jsonc) `vars` and local `.env.local`. Set to `off` to bypass.
 - `SKIP_AI_GATEWAY=1` — chat calls Workers AI directly without gateway.
+- `CHAT_USE_DYNAMIC_ROUTES=1` — opt-in AI Gateway Dynamic Routes (`dynamic/*`) for non-Gemma. Default **off** (compat currently returns 400 Bad input); chat uses `AI.run` + app Gemma fallback instead.
 
 ## Commands
 
@@ -135,7 +136,9 @@ Chat routes Workers AI through AI Gateway via the third argument to `env.AI.run(
 
 ### Dynamic Routing (non-Gemma fallback → Gemma 4)
 
-Non-Gemma picker models call AI Gateway Dynamic Routes (`dynamic/<name>`) via `env.AI.gateway("buc-chat").run({ provider: "compat", … })`. On primary error/timeout the route falls back to Gemma 4. **Gemma 4 stays on `AI.run`** (default model unchanged).
+**Default path:** non-Gemma models use `AI.run(selectedModel)` through the gateway binding, then one app-level retry with **Gemma 4** on timeout/unavailable/5xx. Gemma always uses `AI.run` only.
+
+**Opt-in Dynamic Routes:** set `CHAT_USE_DYNAMIC_ROUTES=1` to try `dynamic/<name>` via `env.AI.gateway("buc-chat").run({ provider: "compat", … })` first. Compat currently fails with HTTP 400 Bad input for Workers AI models (audio schema), so leave the flag off until Cloudflare/BYOK/compat is fixed. When enabled and the compat call fails, the app still falls back to `AI.run` then Gemma.
 
 | Route | Primary | Fallback |
 |-------|---------|----------|
@@ -143,11 +146,10 @@ Non-Gemma picker models call AI Gateway Dynamic Routes (`dynamic/<name>`) via `e
 | `llama-scout` | Llama 4 Scout | Gemma 4 |
 | `mistral-small` | Mistral Small 3.1 | Gemma 4 |
 | `nemotron` | Nemotron 3 Super | Gemma 4 |
-| `glm-flash` | GLM 4.7 Flash | Gemma 4 |
 
-App mapping: [`lib/chat/dynamic-routes.ts`](lib/chat/dynamic-routes.ts). Routes live on Cloudflare (`buc-chat` → Dynamic Routes); edit/redeploy further changes in the **dashboard**.
+App mapping: [`lib/chat/dynamic-routes.ts`](lib/chat/dynamic-routes.ts). Routes may remain deployed on Cloudflare (`buc-chat` → Dynamic Routes) but are unused while the flag is off.
 
-**Verify:** send a chat on production → AI Gateway → `buc-chat` → Logs. For non-Gemma picks, confirm fallback uses Gemma when the primary fails/times out (`cf-aig-model`).
+**Verify:** non-Gemma chats complete without `Dynamic route failed` warnings when the flag is off. With the flag on, check AI Gateway logs / `cf-aig-model` once compat stops returning 400.
 
 ## Chat API
 

@@ -8,7 +8,6 @@ export const CHAT_MODEL_LLAMA_4_SCOUT =
   "@cf/meta/llama-4-scout-17b-16e-instruct" as const;
 export const CHAT_MODEL_MISTRAL_SMALL =
   "@cf/mistralai/mistral-small-3.1-24b-instruct" as const;
-export const CHAT_MODEL_GLM_47_FLASH = "@cf/zai-org/glm-4.7-flash" as const;
 
 /** Production chat subdomain — primary canonical host. */
 export const PRODUCTION_CHAT_HOST = "chat.bilauitmcuti.com";
@@ -66,14 +65,6 @@ export const CHAT_MODELS: readonly ChatModelOption[] = [
     name: "Nemotron 3 Super",
     description: "Best for complex reasoning",
     provider: "nvidia",
-    functionCalling: true,
-    reasoningUi: true,
-  },
-  {
-    id: CHAT_MODEL_GLM_47_FLASH,
-    name: "GLM 4.7 Flash",
-    description: "Detailed explanations",
-    provider: "zai",
     functionCalling: true,
     reasoningUi: true,
   },
@@ -177,7 +168,6 @@ export function modelSupportsFunctionCalling(modelId: string): boolean {
   if (isGooglePartnerModelId(modelId)) return true;
   if (modelId.includes("llama-4")) return true;
   if (modelId.includes("mistral-small")) return true;
-  if (modelId.includes("glm-4.7") || modelId.includes("glm-5")) return true;
   if (modelId.includes("nemotron-3")) return true;
   return false;
 }

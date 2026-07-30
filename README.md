@@ -20,7 +20,7 @@ The product stays focused on calendar and UiTM orientation questions. It is not 
 
 Users can pick a Cloudflare Workers AI model in the composer. All picker models support **function calling** (tool use).
 
-The chat composer lets users pick from multiple Cloudflare Workers AI models, including Gemma 4 (default), Llama 4 Scout, Mistral Small 3.1, Nemotron 3 Super, and GLM 4.7 Flash. All available models support function calling, enabling the assistant to look up academic facts before answering.
+The chat composer lets users pick from multiple Cloudflare Workers AI models, including Gemma 4 (default), Llama 4 Scout, Mistral Small 3.1, and Nemotron 3 Super. All available models support function calling, enabling the assistant to look up academic facts before answering.
 
 Function calling lets the assistant look up the right academic facts before answering. Reasoning-capable models can show a short thinking/reasoning section in the chat UI for harder questions.
 
@@ -28,7 +28,7 @@ Function calling lets the assistant look up the right academic facts before answ
 
 - Streaming chat UI for academic calendar and UiTM general questions
 - Tool-calling agent with function calling across the model picker
-- Reasoning UI for models that support it (Gemma 4, Nemotron 3 Super, GLM 4.7 Flash)
+- Reasoning UI for models that support it (Gemma 4, Nemotron 3 Super)
 - Session / program scope picker so answers match the user’s campus group and semester
 - Markdown replies (tables, code, math, diagrams where relevant)
 - Cloudflare Turnstile bot protection on chat

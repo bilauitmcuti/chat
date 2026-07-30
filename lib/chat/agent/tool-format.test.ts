@@ -33,16 +33,13 @@ describe("formatToolsForModel", () => {
     });
   });
 
-  it("uses OpenAI function shape for dynamic-route models (compat path)", () => {
-    expect(usesOpenAiFunctionToolFormat(CHAT_MODEL_LLAMA_4_SCOUT)).toBe(true);
+  it("uses flat Workers AI tools for Llama (Dynamic Route normalizes in compat query)", () => {
+    expect(usesOpenAiFunctionToolFormat(CHAT_MODEL_LLAMA_4_SCOUT)).toBe(false);
     const formatted = formatToolsForModel(CHAT_MODEL_LLAMA_4_SCOUT, [sampleTool]);
     expect(formatted[0]).toEqual({
-      type: "function",
-      function: {
-        name: sampleTool.name,
-        description: sampleTool.description,
-        parameters: sampleTool.parameters,
-      },
+      name: sampleTool.name,
+      description: sampleTool.description,
+      parameters: sampleTool.parameters,
     });
   });
 

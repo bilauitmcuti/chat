@@ -9,9 +9,10 @@ import {
   usesOpenAiFunctionToolFormat,
   type FlatToolDefinition,
 } from "@/lib/chat/agent/tool-format";
-import { getDynamicRouteModelId } from "@/lib/chat/dynamic-routes";
+import { getDynamicRouteModelId, isDynamicRoutingEnabled } from "@/lib/chat/dynamic-routes";
 import { CHAT_MAX_MESSAGE_LENGTH } from "@/lib/chat/limits";
 import { trimHistoryForModel } from "@/lib/chat/history-for-model";
+import { logger } from "@/lib/logger";
 import {
   CHAT_MODEL_GEMMA_4,
   CHAT_MODEL_LLAMA_32,
@@ -149,13 +150,61 @@ function normalizeToolsToOpenAiCompat(tools: unknown[]): unknown[] {
   });
 }
 
+function normalizeToolCallsToOpenAiCompat(toolCalls: unknown[]): unknown[] {
+  return toolCalls.map((call, index) => {
+    if (!call || typeof call !== "object") return call;
+    const c = call as Record<string, unknown>;
+    if (c.type === "function" && c.function && typeof c.function === "object") {
+      return call;
+    }
+    const name = typeof c.name === "string" ? c.name : "";
+    if (!name) return call;
+    const args = c.arguments ?? c.args ?? {};
+    return {
+      id: typeof c.id === "string" ? c.id : `call_${name}_${index}`,
+      type: "function",
+      function: {
+        name,
+        arguments:
+          typeof args === "string" ? args : JSON.stringify(args ?? {}),
+      },
+    };
+  });
+}
+
+/** Normalize chat messages so Dynamic Route compat accepts Workers-shaped tool turns. */
+export function normalizeMessagesToOpenAiCompat(messages: unknown[]): unknown[] {
+  return messages.map((msg) => {
+    if (!msg || typeof msg !== "object") return msg;
+    const m = msg as Record<string, unknown>;
+    if (m.role === "tool") {
+      const out: Record<string, unknown> = {
+        role: "tool",
+        content: m.content,
+      };
+      if (typeof m.tool_call_id === "string") out.tool_call_id = m.tool_call_id;
+      else if (typeof m.name === "string") out.tool_call_id = `call_${m.name}`;
+      return out;
+    }
+    if (m.role === "assistant" && Array.isArray(m.tool_calls)) {
+      return {
+        ...m,
+        tool_calls: normalizeToolCallsToOpenAiCompat(m.tool_calls),
+      };
+    }
+    return msg;
+  });
+}
+
 /** Build OpenAI-compat chat/completions query for a Dynamic Route. */
 export function buildDynamicRouteCompatQuery(
   dynamicModelId: string,
   input: Record<string, unknown>
 ): Record<string, unknown> {
   const query: Record<string, unknown> = { model: dynamicModelId };
-  if (Array.isArray(input.messages)) query.messages = input.messages;
+  if (Array.isArray(input.messages)) {
+    query.messages = normalizeMessagesToOpenAiCompat(input.messages);
+  }
   if (typeof input.max_tokens === "number") query.max_tokens = input.max_tokens;
   if (typeof input.temperature === "number") query.temperature = input.temperature;
   if (input.stream === true) query.stream = true;
@@ -187,6 +236,26 @@ function buildDynamicRouteGatewayHeaders(
   return headers;
 }
 
+function adaptInputForGemmaFallback(
+  input: Record<string, unknown>
+): Record<string, unknown> {
+  const next: Record<string, unknown> = { ...input };
+  if (Array.isArray(next.tools)) {
+    next.tools = normalizeToolsToOpenAiCompat(next.tools);
+  }
+  if (Array.isArray(next.messages)) {
+    next.messages = normalizeMessagesToOpenAiCompat(next.messages);
+  }
+  next.chat_template_kwargs = { enable_thinking: false, thinking: false };
+  return next;
+}
+
+function truncateErrorSnippet(value: string, max = 240): string {
+  const trimmed = value.trim();
+  if (trimmed.length <= max) return trimmed;
+  return `${trimmed.slice(0, max)}…`;
+}
+
 async function unwrapGatewayCompatResponse(
   response: Response,
   stream: boolean
@@ -200,47 +269,130 @@ async function unwrapGatewayCompatResponse(
     throw err;
   }
   if (stream) {
-    if (!response.body) throw new Error("Empty stream from AI Gateway dynamic route");
+    if (!response.body) {
+      throw new Error("Empty stream from AI Gateway dynamic route");
+    }
     return response.body;
   }
+
   const contentType = response.headers.get("content-type") ?? "";
+  let payload: unknown;
   if (contentType.includes("application/json")) {
-    return response.json();
+    payload = await response.json();
+  } else {
+    const text = await response.text();
+    try {
+      payload = JSON.parse(text) as unknown;
+    } catch {
+      payload = text;
+    }
   }
-  const text = await response.text();
-  try {
-    return JSON.parse(text) as unknown;
-  } catch {
-    return text;
+
+  if (payload && typeof payload === "object") {
+    const obj = payload as Record<string, unknown>;
+    if (obj.success === false || obj.error != null) {
+      const detail =
+        typeof obj.error === "string"
+          ? obj.error
+          : obj.error && typeof obj.error === "object"
+            ? JSON.stringify(obj.error)
+            : Array.isArray(obj.errors)
+              ? JSON.stringify(obj.errors)
+              : "AI Gateway dynamic route returned an error payload";
+      const err = new Error(detail);
+      Object.assign(err, { status: 500 });
+      throw err;
+    }
+    const choices = obj.choices;
+    if (Array.isArray(choices) && choices.length === 0) {
+      const err = new Error("Empty response from AI Gateway dynamic route");
+      Object.assign(err, { status: 502 });
+      throw err;
+    }
   }
+
+  return payload;
 }
 
-async function runAiWithGateway(
+async function runViaDynamicRoute(
+  ai: Ai,
+  dynamicModelId: string,
+  input: Record<string, unknown>,
+  gatewayOpts?: AiGatewayRunOptions
+): Promise<unknown> {
+  const gatewayId = await resolveAiGatewayId();
+  const query = buildDynamicRouteCompatQuery(dynamicModelId, input);
+  const response = await ai.gateway(gatewayId).run({
+    provider: "compat",
+    endpoint: "chat/completions",
+    headers: buildDynamicRouteGatewayHeaders(gatewayOpts),
+    query,
+  } as Parameters<ReturnType<Ai["gateway"]>["run"]>[0]);
+  return unwrapGatewayCompatResponse(response, input.stream === true);
+}
+
+async function runViaAiRun(
+  ai: Ai,
+  modelId: string,
+  input: Record<string, unknown>,
+  gatewayOpts?: AiGatewayRunOptions
+): Promise<unknown> {
+  const options = await buildAiGatewayRunOptions(gatewayOpts);
+  if (options) return ai.run(modelId, input, options);
+  return ai.run(modelId, input);
+}
+
+/**
+ * Prefer Dynamic Route for non-Gemma only when CHAT_USE_DYNAMIC_ROUTES is on;
+ * otherwise AI.run(primary), then Gemma on model fallback errors.
+ */
+export async function runAiWithGateway(
   ai: Ai,
   modelId: string,
   input: Record<string, unknown>,
   gatewayOpts?: AiGatewayRunOptions
 ): Promise<unknown> {
   const gatewayEnabled = await isAiGatewayEnabled();
-  const dynamicModelId = gatewayEnabled ? getDynamicRouteModelId(modelId) : null;
+  const dynamicModelId =
+    gatewayEnabled && isDynamicRoutingEnabled()
+      ? getDynamicRouteModelId(modelId)
+      : null;
 
   if (dynamicModelId) {
-    const gatewayId = await resolveAiGatewayId();
-    const query = buildDynamicRouteCompatQuery(dynamicModelId, input);
-    const response = await ai.gateway(gatewayId).run({
-      provider: "compat",
-      endpoint: "chat/completions",
-      headers: buildDynamicRouteGatewayHeaders(gatewayOpts),
-      query,
-    } as Parameters<ReturnType<Ai["gateway"]>["run"]>[0]);
-    return unwrapGatewayCompatResponse(response, input.stream === true);
+    try {
+      return await runViaDynamicRoute(ai, dynamicModelId, input, gatewayOpts);
+    } catch (error) {
+      const status = getAiErrorStatus(error);
+      logger.warn("Dynamic route failed; falling back to AI.run", {
+        modelId,
+        dynamicModelId,
+        status,
+        error: truncateErrorSnippet(normalizeAiErrorMessage(error)),
+      });
+    }
   }
 
-  const options = await buildAiGatewayRunOptions(gatewayOpts);
-  if (options) {
-    return ai.run(modelId, input, options);
+  try {
+    return await runViaAiRun(ai, modelId, input, gatewayOpts);
+  } catch (error) {
+    const isGemma =
+      modelId === DEFAULT_CHAT_MODEL ||
+      modelId === CHAT_MODEL_GEMMA_4 ||
+      modelId.includes("gemma-4");
+    if (isGemma || !isModelFallbackError(error)) throw error;
+
+    logger.warn("Primary model failed; falling back to Gemma 4", {
+      modelId,
+      status: getAiErrorStatus(error),
+      error: truncateErrorSnippet(normalizeAiErrorMessage(error)),
+    });
+    return runViaAiRun(
+      ai,
+      DEFAULT_CHAT_MODEL,
+      adaptInputForGemmaFallback(input),
+      gatewayOpts
+    );
   }
-  return ai.run(modelId, input);
 }
 
 function truncate(str: string, max: number): string {

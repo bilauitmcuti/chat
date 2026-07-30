@@ -29,10 +29,10 @@ function SystemThemeSync() {
   const { theme, setTheme, resolvedTheme } = useTheme();
 
   useEffect(() => {
-    if (isFollowingSystem(readStoredTheme())) {
-      setTheme('system');
-    }
-  }, [setTheme]);
+    if (!isFollowingSystem(readStoredTheme())) return;
+    if (theme === "system") return;
+    setTheme("system");
+  }, [theme, setTheme]);
 
   useEffect(() => {
     const media = window.matchMedia('(prefers-color-scheme: dark)');

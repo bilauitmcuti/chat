@@ -22,10 +22,7 @@ import {
   ContextMenuItem,
   ContextMenuTrigger,
 } from "@/components/ui/context-menu";
-import {
-  CHAT_ACTION_APPEAR,
-  StreamdownRenderer,
-} from "@/components/ui/streamdown-renderer";
+import { CHAT_ACTION_APPEAR } from "@/components/ui/streamdown-motion";
 import {
   Message,
   MessageContent,
@@ -40,6 +37,20 @@ import { useLiveDurationSec } from "@/components/chat/use-live-duration-sec";
 import { useReasoningVisibility } from "@/components/chat/use-reasoning-visibility";
 import { CHAT_STREAM_PHASE } from "@/lib/chat/stream-phase";
 import { isMinimalConversationalMessage } from "@/lib/chat/intent";
+import dynamic from "next/dynamic";
+
+const StreamdownRenderer = dynamic(
+  () =>
+    import("@/components/ui/streamdown-renderer").then((mod) => mod.StreamdownRenderer),
+  {
+    ssr: false,
+    loading: () => (
+      <p className="text-sm leading-relaxed whitespace-pre-wrap break-words text-muted-foreground md:text-[0.9375rem]">
+        …
+      </p>
+    ),
+  }
+);
 
 interface ChatMessageRowProps {
   message: ChatMessageItem;

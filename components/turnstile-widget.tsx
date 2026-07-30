@@ -132,7 +132,7 @@ function TurnstileWidget({
   return (
     <div
       ref={containerRef}
-      className={`w-full ${className ?? ""}`.trim()}
+      className={`min-h-[65px] w-full ${className ?? ""}`.trim()}
     />
   );
 });

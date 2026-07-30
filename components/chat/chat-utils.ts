@@ -11,9 +11,7 @@ import {
 export {
   consumeChatStream,
   createMarkdownStreamPainter,
-  createReasoningStreamPainter,
   createRafMarkdownStreamPainter,
-  createRafReasoningStreamPainter,
 } from "@/lib/chat/sse";
 export type { ChatStreamDonePayload } from "@/lib/chat/sse";
 export {

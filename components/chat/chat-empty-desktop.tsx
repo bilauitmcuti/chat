@@ -17,24 +17,29 @@ import {
 
 interface ChatEmptyDesktopProps {
   showTurnstileChallenge: boolean;
+  /** Reserve fixed Turnstile height (widget may still be gated until mount). */
+  showTurnstileSlot?: boolean;
   turnstileSiteKey: string;
   turnstileNonce: number;
   turnstileRef: React.RefObject<TurnstileWidgetHandle | null>;
   onTurnstileToken: (token: string) => void;
   suggestions: string[];
   suggestionsDisabled: boolean;
+  suggestionsLoading?: boolean;
   onSuggestionSelect: (suggestion: string) => void;
   composer: ChatComposerFormProps;
 }
 
 export function ChatEmptyDesktop({
   showTurnstileChallenge,
+  showTurnstileSlot = false,
   turnstileSiteKey,
   turnstileNonce,
   turnstileRef,
   onTurnstileToken,
   suggestions,
   suggestionsDisabled,
+  suggestionsLoading = false,
   onSuggestionSelect,
   composer,
 }: ChatEmptyDesktopProps) {
@@ -47,15 +52,17 @@ export function ChatEmptyDesktop({
               Ask AI, get instant answers
             </EmptyTitle>
           </EmptyHeader>
-          {showTurnstileChallenge ? (
-            <div className="mx-auto mt-4 w-full max-w-[320px] px-3">
-              <TurnstileWidget
-                ref={turnstileRef}
-                key={turnstileNonce}
-                siteKey={turnstileSiteKey}
-                action="chat_message"
-                onToken={onTurnstileToken}
-              />
+          {showTurnstileSlot ? (
+            <div className="mx-auto mt-4 flex min-h-[65px] w-full max-w-[320px] items-start justify-center px-3">
+              {showTurnstileChallenge ? (
+                <TurnstileWidget
+                  ref={turnstileRef}
+                  key={turnstileNonce}
+                  siteKey={turnstileSiteKey}
+                  action="chat_message"
+                  onToken={onTurnstileToken}
+                />
+              ) : null}
             </div>
           ) : null}
         </Empty>
@@ -63,6 +70,7 @@ export function ChatEmptyDesktop({
         <SuggestionStack
           suggestions={suggestions}
           disabled={suggestionsDisabled}
+          isLoading={suggestionsLoading}
           onSelect={onSuggestionSelect}
         />
       </div>

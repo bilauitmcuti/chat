@@ -27,6 +27,7 @@ interface ChatTranscriptProps {
   copiedId: string | null;
   reactions: Record<string, "up" | "down" | null>;
   showTurnstileChallenge: boolean;
+  showTurnstileSlot?: boolean;
   turnstileSiteKey: string;
   turnstileNonce: number;
   turnstileRef: React.RefObject<TurnstileWidgetHandle | null>;
@@ -48,6 +49,7 @@ export function ChatTranscript({
   copiedId,
   reactions,
   showTurnstileChallenge,
+  showTurnstileSlot = false,
   turnstileSiteKey,
   turnstileNonce,
   turnstileRef,
@@ -67,16 +69,18 @@ export function ChatTranscript({
             aria-busy={isLoading}
             className="mx-auto w-full max-w-[600px] gap-6 pt-14 pb-6 px-2 md:px-0"
           >
-            {showTurnstileChallenge ? (
+            {showTurnstileSlot ? (
               <MessageScrollerItem>
-                <div className="w-full max-w-[320px]">
-                  <TurnstileWidget
-                    ref={turnstileRef}
-                    key={turnstileNonce}
-                    siteKey={turnstileSiteKey}
-                    action="chat_message"
-                    onToken={onTurnstileToken}
-                  />
+                <div className="flex min-h-[65px] w-full max-w-[320px] items-start">
+                  {showTurnstileChallenge ? (
+                    <TurnstileWidget
+                      ref={turnstileRef}
+                      key={turnstileNonce}
+                      siteKey={turnstileSiteKey}
+                      action="chat_message"
+                      onToken={onTurnstileToken}
+                    />
+                  ) : null}
                 </div>
               </MessageScrollerItem>
             ) : null}

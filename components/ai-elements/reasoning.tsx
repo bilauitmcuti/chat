@@ -2,7 +2,6 @@
 
 import {
   Collapsible,
-  CollapsibleContent,
   CollapsibleTrigger,
 } from "@/components/ui/collapsible";
 import { useControllableState } from "@/hooks/use-controllable-state";
@@ -58,7 +57,6 @@ export type ReasoningProps = ComponentProps<typeof Collapsible> & {
 };
 
 const AUTO_CLOSE_DELAY = 1000;
-const TEXT_CROSSFADE_MS = 200;
 
 export const Reasoning = memo(
   ({
@@ -284,108 +282,5 @@ export const ReasoningTrigger = memo(
   }
 );
 
-export type ReasoningContentProps = ComponentProps<
-  typeof CollapsibleContent
-> & {
-  children: string;
-};
-
-export const ReasoningContent = memo(
-  ({ className, children, ...props }: ReasoningContentProps) => {
-    const paragraph = children.trim();
-    const [active, setActive] = useState(paragraph);
-    const [fading, setFading] = useState<string | null>(null);
-    const [fadingVisible, setFadingVisible] = useState(false);
-    const [activeVisible, setActiveVisible] = useState(Boolean(paragraph));
-    const activeRef = useRef(paragraph);
-    const isFirstPaintRef = useRef(true);
-
-    useEffect(() => {
-      if (!paragraph) {
-        activeRef.current = "";
-        setActive("");
-        setFading(null);
-        setFadingVisible(false);
-        setActiveVisible(false);
-        return;
-      }
-
-      if (paragraph === activeRef.current) {
-        setActiveVisible(true);
-        return;
-      }
-
-      const previous = activeRef.current;
-      if (isFirstPaintRef.current || !previous) {
-        isFirstPaintRef.current = false;
-        activeRef.current = paragraph;
-        setActive(paragraph);
-        setFading(null);
-        setFadingVisible(false);
-        setActiveVisible(true);
-        return;
-      }
-
-      activeRef.current = paragraph;
-      setFading(previous);
-      setFadingVisible(true);
-      setActive(paragraph);
-      setActiveVisible(false);
-
-      const rafId = window.requestAnimationFrame(() => {
-        setFadingVisible(false);
-        setActiveVisible(true);
-      });
-
-      const clearTimer = window.setTimeout(() => {
-        setFading(null);
-      }, TEXT_CROSSFADE_MS);
-
-      return () => {
-        window.cancelAnimationFrame(rafId);
-        window.clearTimeout(clearTimer);
-      };
-    }, [paragraph]);
-
-    return (
-      <CollapsibleContent
-        className={cn(
-          "mt-4 text-sm md:text-[0.9375rem]",
-          "data-[state=closed]:fade-out-0 data-[state=closed]:slide-out-to-top-2 data-[state=open]:slide-in-from-top-2 text-muted-foreground outline-none data-[state=closed]:animate-out data-[state=open]:animate-in motion-reduce:animate-none",
-          className
-        )}
-        {...props}
-      >
-        {active || fading ? (
-          <div className="relative">
-            {fading ? (
-              <p
-                className={cn(
-                  "absolute inset-x-0 top-0 leading-relaxed transition-opacity duration-[160ms] ease-out",
-                  fadingVisible ? "opacity-100" : "opacity-0"
-                )}
-                aria-hidden
-              >
-                {fading}
-              </p>
-            ) : null}
-            {active ? (
-              <p
-                className={cn(
-                  "leading-relaxed transition-opacity duration-[160ms] ease-out",
-                  activeVisible ? "opacity-100" : "opacity-0"
-                )}
-              >
-                {active}
-              </p>
-            ) : null}
-          </div>
-        ) : null}
-      </CollapsibleContent>
-    );
-  }
-);
-
 Reasoning.displayName = "Reasoning";
 ReasoningTrigger.displayName = "ReasoningTrigger";
-ReasoningContent.displayName = "ReasoningContent";

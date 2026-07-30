@@ -18,24 +18,29 @@ import {
 
 interface ChatEmptyMobileProps {
   showTurnstileChallenge: boolean;
+  /** Reserve fixed Turnstile height (widget may still be gated until mount). */
+  showTurnstileSlot?: boolean;
   turnstileSiteKey: string;
   turnstileNonce: number;
   turnstileRef: React.RefObject<TurnstileWidgetHandle | null>;
   onTurnstileToken: (token: string) => void;
   suggestions: string[];
   suggestionsDisabled: boolean;
+  suggestionsLoading?: boolean;
   onSuggestionSelect: (suggestion: string) => void;
   composer: ChatComposerFormProps;
 }
 
 export function ChatEmptyMobile({
   showTurnstileChallenge,
+  showTurnstileSlot = false,
   turnstileSiteKey,
   turnstileNonce,
   turnstileRef,
   onTurnstileToken,
   suggestions,
   suggestionsDisabled,
+  suggestionsLoading = false,
   onSuggestionSelect,
   composer,
 }: ChatEmptyMobileProps) {
@@ -52,15 +57,17 @@ export function ChatEmptyMobile({
               mention a calendar.
             </EmptyDescription>
           </EmptyHeader>
-          {showTurnstileChallenge ? (
-            <div className="w-full max-w-[320px] px-3">
-              <TurnstileWidget
-                ref={turnstileRef}
-                key={`mobile-${turnstileNonce}`}
-                siteKey={turnstileSiteKey}
-                action="chat_message"
-                onToken={onTurnstileToken}
-              />
+          {showTurnstileSlot ? (
+            <div className="mx-auto mt-4 flex min-h-[65px] w-full max-w-[320px] items-start justify-center px-3">
+              {showTurnstileChallenge ? (
+                <TurnstileWidget
+                  ref={turnstileRef}
+                  key={`mobile-${turnstileNonce}`}
+                  siteKey={turnstileSiteKey}
+                  action="chat_message"
+                  onToken={onTurnstileToken}
+                />
+              ) : null}
             </div>
           ) : null}
         </Empty>
@@ -69,6 +76,7 @@ export function ChatEmptyMobile({
         <SuggestionChips
           suggestions={suggestions}
           disabled={suggestionsDisabled}
+          isLoading={suggestionsLoading}
           onSelect={onSuggestionSelect}
         />
         <ChatComposerForm

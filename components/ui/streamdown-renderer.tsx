@@ -15,6 +15,7 @@ import {
 } from "@/components/ui/table";
 import { contentToMarkdown } from "@/lib/chat/markdown-suitability";
 import { cn } from "@/lib/utils";
+import { CHAT_STREAM_ANIMATION } from "@/components/ui/streamdown-motion";
 
 const TABLE_CELL_MAX =
   "h-auto min-h-10 max-w-[12rem] sm:max-w-[16rem] whitespace-normal break-words align-top";
@@ -25,19 +26,10 @@ export interface StreamdownRendererProps {
   isComplete?: boolean;
 }
 
-/** Word-by-word blur while the assistant reply streams in. */
-export const CHAT_STREAM_ANIMATION = {
-  animation: "blurIn",
-  duration: 80,
-  easing: "ease-out",
-  sep: "word",
-} as const;
-
-/** Faster blurIn for Copy / thumbs after the answer stream completes. */
-export const CHAT_ACTION_APPEAR = {
-  durationMs: 150,
-  staggerMs: 30,
-} as const;
+export {
+  CHAT_ACTION_APPEAR,
+  CHAT_STREAM_ANIMATION,
+} from "@/components/ui/streamdown-motion";
 
 function subscribeReducedMotion(onStoreChange: () => void) {
   const mq = window.matchMedia("(prefers-reduced-motion: reduce)");

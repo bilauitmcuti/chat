@@ -108,6 +108,16 @@ export default function ChatPage() {
   const [turnstileToken, setTurnstileToken] = useState("");
   const [turnstileNonce, setTurnstileNonce] = useState(0);
   const [isTurnstileSessionVerified, setIsTurnstileSessionVerified] = useState(false);
+  const [hasMounted, setHasMounted] = useState(false);
+  const turnstileCookieVerified = useSyncExternalStore(
+    () => () => {},
+    () =>
+      document.cookie
+        .split(";")
+        .some((item) => item.trim().startsWith(`${CHAT_TURNSTILE_COOKIE}=1`)),
+    () => false
+  );
+  const isTurnstileVerified = turnstileCookieVerified || isTurnstileSessionVerified;
   const [selectedProgram, setSelectedProgram] = useState<ProgramValue>("All");
   const [selectedSessions, setSelectedSessions] = useState<SessionId[]>(() =>
     getInitialChatSessions("All")
@@ -148,7 +158,10 @@ export default function ChatPage() {
     const opt = getProgramOptions().find((p) => p.value === selectedProgram);
     return opt?.group ?? getGroupFromProgram(selectedProgram);
   }, [selectedProgram, calendarDataVersion]);
-  const [suggestions, setSuggestions] = useState<string[]>([]);
+  const [suggestions, setSuggestions] = useState<string[]>(() =>
+    getRandomSuggestions(getGroupFromProgram("All"), [])
+  );
+  const lastSuggestionGroupRef = useRef<"A" | "B">(getGroupFromProgram("All"));
   const [isMentionOpen, setIsMentionOpen] = useState(false);
   const [mentionQuery, setMentionQuery] = useState("");
   const [activeMentionIndex, setActiveMentionIndex] = useState(0);
@@ -157,21 +170,23 @@ export default function ChatPage() {
 
   const { siteKey: turnstileSiteKey, isReady: isTurnstileConfigReady } =
     useTurnstileSiteKeyFromContext();
-  const requiresTurnstile = Boolean(turnstileSiteKey) && !isTurnstileSessionVerified;
+  const requiresTurnstile = Boolean(turnstileSiteKey) && !isTurnstileVerified;
   const waitForTurnstileConfig =
     process.env.NODE_ENV === "production" && !isTurnstileConfigReady;
-  /** Hide widget as soon as Turnstile returns a token; keeps "Verifying..." off-screen during fetch. */
-  const showTurnstileChallenge = requiresTurnstile && !turnstileToken.trim();
+  /**
+   * Reserve slot height from first paint when a site key is known / config pending.
+   * Widget itself waits for mount so SSR + cookie hydrate do not flash the challenge.
+   */
+  const showTurnstileSlot =
+    waitForTurnstileConfig || (Boolean(turnstileSiteKey) && !isTurnstileVerified);
+  const showTurnstileChallenge =
+    hasMounted && requiresTurnstile && !turnstileToken.trim();
 
-  useEffect(() => {
-    if (typeof document === "undefined") return;
-    const hasVerifiedCookie = document.cookie
-      .split(";")
-      .some((item) => item.trim().startsWith(`${CHAT_TURNSTILE_COOKIE}=1`));
-    if (hasVerifiedCookie) setIsTurnstileSessionVerified(true);
+  useLayoutEffect(() => {
+    setHasMounted(true);
   }, []);
 
-  useEffect(() => {
+  useLayoutEffect(() => {
     const host = window.location.hostname;
     setChatModels(getVisibleChatModels(host));
     const stored = readStoredChatModel(host);
@@ -254,16 +269,23 @@ export default function ChatPage() {
     });
   }, [selectedProgram, sessionsByProgram]);
 
-  // Randomize suggestions on mount and when program/group changes (pool follows programOptions.group)
+  // Fresh suggestion set on every refresh/reopen (shell stays mounted; only list text swaps).
   useLayoutEffect(() => {
+    lastSuggestionGroupRef.current = suggestionGroup;
+    setSuggestions(getRandomSuggestions(suggestionGroup, []));
+    // eslint-disable-next-line react-hooks/exhaustive-deps -- mount-only re-roll
+  }, []);
+
+  // Re-roll when program group changes after hydrate / user selection.
+  useLayoutEffect(() => {
+    if (lastSuggestionGroupRef.current === suggestionGroup) return;
+    lastSuggestionGroupRef.current = suggestionGroup;
     setSuggestions(getRandomSuggestions(suggestionGroup, []));
   }, [suggestionGroup]);
 
-  useEffect(() => {
-    void import("@/components/ui/streamdown-renderer");
-  }, []);
-
   const [streamStatusPhrase, setStreamStatusPhrase] = useState("");
+  // Skeleton only before suggestions exist — never swap real chips for skeleton during Turnstile wait.
+  const suggestionsLoading = suggestions.length === 0;
 
   const startLoadingState = useCallback(() => {
     setStreamStatusPhrase("Thinking…");
@@ -1155,12 +1177,14 @@ export default function ChatPage() {
           <>
             <ChatEmptyDesktop
               showTurnstileChallenge={showTurnstileChallenge && isDesktopViewport}
+              showTurnstileSlot={showTurnstileSlot}
               turnstileSiteKey={turnstileSiteKey ?? ""}
               turnstileNonce={turnstileNonce}
               turnstileRef={turnstileRef}
               onTurnstileToken={setTurnstileToken}
               suggestions={suggestions}
               suggestionsDisabled={suggestionsDisabled}
+              suggestionsLoading={suggestionsLoading}
               onSuggestionSelect={sendMessage}
               composer={{
                 ...composerFormProps,
@@ -1176,12 +1200,14 @@ export default function ChatPage() {
             />
             <ChatEmptyMobile
               showTurnstileChallenge={showTurnstileChallenge && !isDesktopViewport}
+              showTurnstileSlot={showTurnstileSlot}
               turnstileSiteKey={turnstileSiteKey ?? ""}
               turnstileNonce={turnstileNonce}
               turnstileRef={turnstileRef}
               onTurnstileToken={setTurnstileToken}
               suggestions={suggestions}
               suggestionsDisabled={suggestionsDisabled}
+              suggestionsLoading={suggestionsLoading}
               onSuggestionSelect={sendMessage}
               composer={{
                 ...composerFormProps,
@@ -1206,6 +1232,7 @@ export default function ChatPage() {
               copiedId={copiedId}
               reactions={reactions}
               showTurnstileChallenge={showTurnstileChallenge}
+              showTurnstileSlot={showTurnstileSlot}
               turnstileSiteKey={turnstileSiteKey ?? ""}
               turnstileNonce={turnstileNonce}
               turnstileRef={turnstileRef}

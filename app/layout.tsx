@@ -3,7 +3,6 @@ import React, { Suspense } from "react";
 import { ThemeProvider } from "@/components/theme-provider";
 import { ThemeShortcut } from "@/components/theme-shortcut";
 import { VersionBanner } from "@/components/version-banner";
-import { TooltipProviderRoot } from "@/components/tooltip-provider-root";
 import { ZarazPageView } from "@/components/zaraz-page-view";
 import { ChatCalendarBootstrap } from "@/components/chat-calendar-bootstrap";
 import { PageSeoBlock } from "@/components/page-seo-block";
@@ -125,6 +124,9 @@ export default function RootLayout({
           content="#1a1a1a"
           media="(prefers-color-scheme: dark)"
         />
+        {getTurnstileSiteKey() ? (
+          <link rel="preconnect" href="https://challenges.cloudflare.com" />
+        ) : null}
         <meta name="application-name" content="Bila UiTM Cuti Chat" />
         <script
           type="application/ld+json"
@@ -162,11 +164,14 @@ export default function RootLayout({
                     return window.matchMedia('(prefers-color-scheme: dark)').matches ? 'dark' : 'light';
                   }
                   var resolvedTheme = resolveTheme(theme);
-                  document.documentElement.classList.remove('dark', 'light');
-                  document.documentElement.classList.add(resolvedTheme);
-                  document.documentElement.style.colorScheme = resolvedTheme;
+                  var root = document.documentElement;
+                  root.classList.remove('dark', 'light');
+                  root.classList.add(resolvedTheme);
+                  root.style.colorScheme = resolvedTheme;
+                  root.style.backgroundColor = resolvedTheme === 'dark' ? 'oklch(0.145 0 0)' : 'oklch(1 0 0)';
                 } catch (e) {
                   document.documentElement.classList.add('light');
+                  document.documentElement.style.backgroundColor = 'oklch(1 0 0)';
                 }
               })();
             `,
@@ -183,18 +188,16 @@ export default function RootLayout({
           disableTransitionOnChange={true}
         >
           <ThemeShortcut />
-          <TooltipProviderRoot>
-            <TurnstileSiteKeyProvider initialSiteKey={getTurnstileSiteKey()}>
-              <PageSeoBlock
-                heading={CHAT_SEO_TITLE}
-                description={CHAT_SEO_DESCRIPTION}
-                url={SITE_ORIGIN}
-                breadcrumbs={[{ name: "Chat", item: SITE_ORIGIN }]}
-              />
-              <ChatCalendarBootstrap />
-              {children}
-            </TurnstileSiteKeyProvider>
-          </TooltipProviderRoot>
+          <TurnstileSiteKeyProvider initialSiteKey={getTurnstileSiteKey()}>
+            <PageSeoBlock
+              heading={CHAT_SEO_TITLE}
+              description={CHAT_SEO_DESCRIPTION}
+              url={SITE_ORIGIN}
+              breadcrumbs={[{ name: "Chat", item: SITE_ORIGIN }]}
+            />
+            <ChatCalendarBootstrap />
+            {children}
+          </TurnstileSiteKeyProvider>
         </ThemeProvider>
         <Suspense fallback={null}>
           <ZarazPageView />

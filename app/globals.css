@@ -84,22 +84,23 @@ html {
   /* No default background - script will set it based on localStorage */
 }
 
+/* Prevent flash of wrong theme during page load — match body --background tokens */
 html.light {
-  background-color: #ffffff !important;
-  color: #1a1a1a !important;
+  background-color: var(--background) !important;
+  color: var(--foreground) !important;
 }
 
 /* Mention picker & engagement prompt shells — match page white in light theme */
 .responsive-shell-bg {
-  background-color: #ffffff !important;
+  background-color: var(--background) !important;
 }
 html.dark .responsive-shell-bg {
   background-color: var(--popover) !important;
 }
 
 html.dark {
-  background-color: #1a1a1a !important;
-  color: #ffffff !important;
+  background-color: var(--background) !important;
+  color: var(--foreground) !important;
 }
 
 /* Disable transitions for main page containers - instant theme switching */

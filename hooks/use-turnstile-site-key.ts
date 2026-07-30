@@ -10,32 +10,42 @@ export interface TurnstileSiteKeyState {
 
 const TurnstileSiteKeyContext = createContext<TurnstileSiteKeyState | null>(null);
 
+function resolveInitialTurnstileState(initialSiteKey: string): TurnstileSiteKeyState {
+  if (process.env.NODE_ENV !== "production") {
+    return { siteKey: "", isReady: true };
+  }
+
+  const inlined = (process.env.NEXT_PUBLIC_TURNSTILE_SITE_KEY ?? "").trim();
+  if (inlined) return { siteKey: inlined, isReady: true };
+
+  const fromServer = initialSiteKey.trim();
+  if (fromServer) return { siteKey: fromServer, isReady: true };
+
+  return { siteKey: "", isReady: false };
+}
+
 /**
  * Resolves the Turnstile site key for client pages. Build-inlined NEXT_PUBLIC_* is used
  * first; otherwise optional server `initialSiteKey`, then same-origin config API (runtime env).
  */
 export function useTurnstileSiteKey(initialSiteKey = ""): TurnstileSiteKeyState {
-  const [siteKey, setSiteKey] = useState("");
-  const [isReady, setIsReady] = useState(false);
+  const [state, setState] = useState(() => resolveInitialTurnstileState(initialSiteKey));
 
   useEffect(() => {
     if (process.env.NODE_ENV !== "production") {
-      setSiteKey("");
-      setIsReady(true);
+      setState({ siteKey: "", isReady: true });
       return;
     }
 
     const inlined = (process.env.NEXT_PUBLIC_TURNSTILE_SITE_KEY ?? "").trim();
     if (inlined) {
-      setSiteKey(inlined);
-      setIsReady(true);
+      setState({ siteKey: inlined, isReady: true });
       return;
     }
 
     const fromServer = initialSiteKey.trim();
     if (fromServer) {
-      setSiteKey(fromServer);
-      setIsReady(true);
+      setState({ siteKey: fromServer, isReady: true });
       return;
     }
 
@@ -47,11 +57,10 @@ export function useTurnstileSiteKey(initialSiteKey = ""): TurnstileSiteKeyState 
       })
       .then((data) => {
         if (cancelled) return;
-        setSiteKey((data.siteKey ?? "").trim());
-        setIsReady(true);
+        setState({ siteKey: (data.siteKey ?? "").trim(), isReady: true });
       })
       .catch(() => {
-        if (!cancelled) setIsReady(true);
+        if (!cancelled) setState((prev) => ({ ...prev, isReady: true }));
       });
 
     return () => {
@@ -59,7 +68,7 @@ export function useTurnstileSiteKey(initialSiteKey = ""): TurnstileSiteKeyState 
     };
   }, [initialSiteKey]);
 
-  return { siteKey, isReady };
+  return state;
 }
 
 export function TurnstileSiteKeyProvider({

@@ -22,7 +22,7 @@ Scripts: `pnpm preview`, `pnpm deploy`, `pnpm upload` (preview versions). `build
 
 [`open-next.config.ts`](open-next.config.ts) sets `buildCommand: "next build"` so OpenNext does not call `pnpm build` (which would recurse into OpenNext).
 
-**Do not** add `bilauitmcuti.com/_next*` routes — calendar Pages owns apex `/_next`. Chat assets use `/chat/_next/*`.
+**Do not** add `bilauitmcuti.com/_next*` routes — calendar Pages owns apex `/_next`. Chat assets use `/chat/_next/*` (post-build mirror via `scripts/mirror-chat-assets.mjs`).
 
 ## Workers Builds (Git) — dashboard must match
 

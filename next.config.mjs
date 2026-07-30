@@ -31,7 +31,12 @@ const nextConfig = {
   images: {
     unoptimized: true,
   },
-  /** Dual-host: assets load from /chat/_next on apex and subdomain; middleware rewrites to /_next. */
+  /**
+   * Dual-host: HTML references /chat/_next/*. OpenNext emits files under
+   * .open-next/assets/_next; scripts/mirror-chat-assets.mjs copies them to
+   * chat/_next so Workers Assets can serve the prefixed URLs (middleware
+   * rewrite alone does not re-fetch ASSETS).
+   */
   assetPrefix: "/chat",
   compress: true,
   poweredByHeader: false,

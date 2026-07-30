@@ -68,7 +68,7 @@ This app deploys with **`@opennextjs/cloudflare`** (not Pages / next-on-pages).
 | Compatibility | `nodejs_compat`, date ≥ `2024-09-23` |
 | AI binding | `AI` (remote) |
 | Gateway var | `AI_GATEWAY_ID=buc-chat` |
-| Asset prefix | `/chat` (HTML references `/chat/_next/*`; middleware rewrites to `/_next/*`) |
+| Asset prefix | `/chat` (HTML references `/chat/_next/*`; post-build mirrors `.open-next/assets/_next` → `chat/_next` for Workers Assets) |
 
 Local / CLI: `pnpm deploy` (runs OpenNext build, then deploy).
 
@@ -89,6 +89,8 @@ Zone `bilauitmcuti.com`:
 ```
 
 **Do not** add a zone Workers route for `bilauitmcuti.com/_next/*` — that steals assets from the apex calendar Pages app. Chat assets are only under `/chat/_next/*`.
+
+`assetPrefix: "/chat"` only changes HTML URLs. OpenNext still emits static files under `.open-next/assets/_next`. Build runs [`scripts/mirror-chat-assets.mjs`](scripts/mirror-chat-assets.mjs) so Workers Assets also has `chat/_next`. Middleware rewrite alone is not enough — Assets match the request path before the Worker, and a Next rewrite does not re-fetch the ASSETS binding.
 
 Calendar Pages must not also claim `/chat`.
 

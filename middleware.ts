@@ -85,7 +85,9 @@ function redirectPath(request: NextRequest, pathname: string): NextResponse {
 
 /**
  * Dual-host path mapping (no Next basePath):
- * - Assets: /chat/_next/* → /_next/*
+ * - Assets: /chat/_next/* is served by Workers Assets after post-build mirror
+ *   (see scripts/mirror-chat-assets.mjs). Rewrite below is a fallback only if
+ *   a request reaches the Worker without a matching asset file.
  * - Chat-only browser APIs under /chat/api/... → /api/... (not calendar/public-holiday)
  * - Apex UI: /chat → /
  * - Subdomain: /chat → redirect /

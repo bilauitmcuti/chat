@@ -16,7 +16,9 @@
     "AI_GATEWAY_ID": "buc-chat"
   },
   "routes": [
-    { "pattern": "chat.bilauitmcuti.com", "custom_domain": true }
+    { "pattern": "chat.bilauitmcuti.com", "custom_domain": true },
+    { "pattern": "bilauitmcuti.com/chat*", "zone_name": "bilauitmcuti.com" },
+    { "pattern": "www.bilauitmcuti.com/chat*", "zone_name": "bilauitmcuti.com" }
   ],
   "observability": {
     "enabled": true

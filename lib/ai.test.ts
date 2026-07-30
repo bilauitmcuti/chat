@@ -83,6 +83,8 @@ describe("getVisibleChatModels / isNonProductionChatHost", () => {
     expect(isNonProductionChatHost("127.0.0.1:8787")).toBe(true);
     expect(isNonProductionChatHost("bilauitmcuti-chat.workers.dev")).toBe(true);
     expect(isNonProductionChatHost(PRODUCTION_CHAT_HOST)).toBe(false);
+    expect(isNonProductionChatHost("bilauitmcuti.com")).toBe(false);
+    expect(isNonProductionChatHost("www.bilauitmcuti.com")).toBe(false);
   });
 
   it("excludes Llama 3.2 from the picker on all hosts", () => {

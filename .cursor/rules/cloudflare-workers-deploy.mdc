@@ -15,12 +15,14 @@ This project deploys with **OpenNext on Cloudflare Workers**, not Pages / next-o
 | Build | `pnpm run build` / `pnpm run build:worker` (`opennextjs-cloudflare build`) |
 | Output | `.open-next/` (`main`: `.open-next/worker.js`, assets: `.open-next/assets`) |
 | Worker name | `chat` (`wrangler.jsonc`) |
-| Domain | `chat.bilauitmcuti.com` |
+| Domain | `chat.bilauitmcuti.com` (UI `/`) + zone routes `bilauitmcuti.com/chat*` / `www.../chat*` |
 | Compatibility | `nodejs_compat` |
 
 Scripts: `pnpm preview`, `pnpm deploy`, `pnpm upload` (preview versions). `build` and `build:worker` both run OpenNext.
 
 [`open-next.config.ts`](open-next.config.ts) sets `buildCommand: "next build"` so OpenNext does not call `pnpm build` (which would recurse into OpenNext).
+
+**Do not** add `bilauitmcuti.com/_next*` routes — calendar Pages owns apex `/_next`. Chat assets use `/chat/_next/*`.
 
 ## Workers Builds (Git) — dashboard must match
 

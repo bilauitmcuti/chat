@@ -17,12 +17,12 @@ npx wrangler login             # required for local Workers AI binding
   - **Default model:** Gemma 4 (`@cf/google/gemma-4-26b-a4b-it`) on all environments.
   - **Client model picker:** users can choose from 5 Workers AI models in the chat composer (Gemma 4, Llama 4 Scout, Mistral Small 3.1, Nemotron 3 Super, GLM 4.7 Flash). See [`lib/chat/models.ts`](lib/chat/models.ts).
   - Optional server default override: `WORKERS_AI_MODEL` (must be an allowlisted model id).
-- `NEXT_PUBLIC_TURNSTILE_SITE_KEY` + `TURNSTILE_SECRET_KEY` — required for Turnstile on chat in production. Set `NEXT_PUBLIC_TURNSTILE_SITE_KEY` in build env, or `TURNSTILE_SITE_KEY` at runtime (client loads via `GET /api/turnstile/config`).
+- `NEXT_PUBLIC_TURNSTILE_SITE_KEY` + `TURNSTILE_SECRET_KEY` — required for Turnstile on chat in production. Set `NEXT_PUBLIC_TURNSTILE_SITE_KEY` in build env, or `TURNSTILE_SITE_KEY` at runtime (client loads via `GET /chat/api/turnstile/config`).
 
 ## Optional Environment
 
 - `DISCORD_WEBHOOK_CHAT_HELPFUL` / `DISCORD_WEBHOOK_CHAT_NOT_HELPFUL` — chat AI thumbs up/down (`POST /chat/feedback/api`). Do not use `NEXT_PUBLIC_*` or commit URLs.
-- `CALENDAR_API_BASE` — optional server-only override for the calendar API origin (default `https://api.bilauitmcuti.com`). Browser uses same-origin `/api/v1/meta` and `/api/v1/calendar`.
+- `CALENDAR_API_BASE` — optional server-only override for the calendar API origin (default `https://api.bilauitmcuti.com`). Browser uses same-origin `/api/v1/meta` and `/api/v1/calendar` (unchanged; shared calendar API surface, not under `/chat`).
 - `CHAT_USE_AGENT` — set to `0` or `false` to disable tool-calling agent globally. See [`lib/chat/agent/run-agent.ts`](lib/chat/agent/run-agent.ts).
 - `AI_GATEWAY_ID` — AI Gateway name (default / production: `buc-chat`). Declared in [`wrangler.jsonc`](wrangler.jsonc) `vars` and local `.env.local`. Set to `off` to bypass.
 - `SKIP_AI_GATEWAY=1` — chat calls Workers AI directly without gateway.
@@ -53,8 +53,8 @@ GitHub Actions (`.github/workflows/ci.yml`):
 
 ## Health & Readiness
 
-- `GET /api/health` — returns `{ status, ai }`. 503 if Workers AI binding is not available.
-- `GET /api/version` — returns build ID.
+- `GET /api/health` (or `/chat/api/health` via dual-host rewrite) — returns `{ status, ai }`. 503 if Workers AI binding is not available.
+- `GET /api/version` (or `/chat/api/version`) — returns build ID.
 
 ## Cloudflare Workers deployment
 
@@ -63,16 +63,45 @@ This app deploys with **`@opennextjs/cloudflare`** (not Pages / next-on-pages).
 | Setting | Value |
 |---------|--------|
 | Worker name | `chat` |
-| Custom domain | `chat.bilauitmcuti.com` |
+| Custom domain | `chat.bilauitmcuti.com` (UI at `/`) |
+| Apex path route | `bilauitmcuti.com/chat*` and `www.bilauitmcuti.com/chat*` (UI at `/chat`) |
 | Compatibility | `nodejs_compat`, date ≥ `2024-09-23` |
 | AI binding | `AI` (remote) |
 | Gateway var | `AI_GATEWAY_ID=buc-chat` |
+| Asset prefix | `/chat` (HTML references `/chat/_next/*`; middleware rewrites to `/_next/*`) |
 
 Local / CLI: `pnpm deploy` (runs OpenNext build, then deploy).
 
 Secrets (dashboard or `wrangler secret put`): `TURNSTILE_SECRET_KEY`, Discord webhooks.
 
-**Do not** add a zone Workers route for `bilauitmcuti.com/_next/*` — that steals assets from the apex calendar Pages app.
+### DNS and Worker routes
+
+Zone `bilauitmcuti.com`:
+
+- **Keep** apex / `www` DNS on the calendar **Pages** app (do not point the whole apex at this Worker).
+- **Keep** `chat.bilauitmcuti.com` as Worker custom domain (no extra DNS for path hosting).
+- [`wrangler.jsonc`](wrangler.jsonc) routes:
+
+```jsonc
+{ "pattern": "chat.bilauitmcuti.com", "custom_domain": true },
+{ "pattern": "bilauitmcuti.com/chat*", "zone_name": "bilauitmcuti.com" },
+{ "pattern": "www.bilauitmcuti.com/chat*", "zone_name": "bilauitmcuti.com" }
+```
+
+**Do not** add a zone Workers route for `bilauitmcuti.com/_next/*` — that steals assets from the apex calendar Pages app. Chat assets are only under `/chat/_next/*`.
+
+Calendar Pages must not also claim `/chat`.
+
+Turnstile widget hostnames: `chat.bilauitmcuti.com`, `bilauitmcuti.com`, `www.bilauitmcuti.com`.
+
+### Dual-host URL behaviour
+
+| Host | UI | Notes |
+|------|-----|--------|
+| `chat.bilauitmcuti.com` | `/` | `/chat` redirects to `/` |
+| `bilauitmcuti.com` | `/chat` | Path route; browser APIs under `/chat/api/...` |
+
+No subdomain → apex redirect yet. Canonical SEO stays on `https://chat.bilauitmcuti.com`.
 
 ### Workers Builds (Git deploy) — required settings
 

@@ -4,7 +4,7 @@ import { createContext, createElement, useContext, useEffect, useState, type Rea
 
 export interface TurnstileSiteKeyState {
   siteKey: string;
-  /** False until inlined env, server prop, or /api/turnstile/config has been resolved. */
+  /** False until inlined env, server prop, or /chat/api/turnstile/config has been resolved. */
   isReady: boolean;
 }
 
@@ -40,7 +40,7 @@ export function useTurnstileSiteKey(initialSiteKey = ""): TurnstileSiteKeyState 
     }
 
     let cancelled = false;
-    fetch("/api/turnstile/config", { credentials: "same-origin" })
+    fetch("/chat/api/turnstile/config", { credentials: "same-origin" })
       .then(async (res) => {
         if (!res.ok) return { siteKey: null as string | null };
         return res.json() as Promise<{ siteKey?: string | null }>;

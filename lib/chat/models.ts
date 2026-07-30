@@ -10,8 +10,16 @@ export const CHAT_MODEL_MISTRAL_SMALL =
   "@cf/mistralai/mistral-small-3.1-24b-instruct" as const;
 export const CHAT_MODEL_GLM_47_FLASH = "@cf/zai-org/glm-4.7-flash" as const;
 
-/** Production chat host — nonProductionOnly models are hidden here. */
+/** Production chat subdomain — primary canonical host. */
 export const PRODUCTION_CHAT_HOST = "chat.bilauitmcuti.com";
+
+/** Apex calendar host when chat is served under /chat (path route). */
+export const PRODUCTION_APEX_HOST = "bilauitmcuti.com";
+
+const PRODUCTION_CHAT_HOSTS = new Set([
+  PRODUCTION_CHAT_HOST,
+  PRODUCTION_APEX_HOST,
+]);
 
 export interface ChatModelOption {
   id: string;
@@ -83,7 +91,7 @@ export function isNonProductionChatHost(hostname?: string | null): boolean {
   if (!host) return process.env.NODE_ENV !== "production";
   if (host === "localhost" || host === "127.0.0.1" || host === "[::1]") return true;
   if (host.endsWith(".workers.dev")) return true;
-  return host !== PRODUCTION_CHAT_HOST;
+  return !PRODUCTION_CHAT_HOSTS.has(host);
 }
 
 export function getVisibleChatModels(

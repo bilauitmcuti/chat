@@ -9,19 +9,22 @@ export interface TurnstileSiteVerifyResponse {
 
 const TURNSTILE_VERIFY_URL = "https://challenges.cloudflare.com/turnstile/v0/siteverify";
 
-/** Production chat host for Turnstile hostname checks. */
-const PRODUCTION_CHAT_HOST = "chat.bilauitmcuti.com";
+/** Production hosts for Turnstile hostname checks (subdomain + apex /chat). */
+const PRODUCTION_TURNSTILE_HOSTS = new Set([
+  "chat.bilauitmcuti.com",
+  "bilauitmcuti.com",
+]);
 
 function normalizeHostname(hostname: string): string {
   return hostname.replace(/^www\./, "").split(":")[0].toLowerCase();
 }
 
 /**
- * When the request Host is the chat production subdomain, enforce Turnstile hostname.
+ * When the request Host is a production chat host, enforce Turnstile hostname.
  */
 export function getTurnstileExpectedHostname(hostHeader: string | null): string | undefined {
   const n = normalizeHostname(hostHeader ?? "");
-  if (n === PRODUCTION_CHAT_HOST) return PRODUCTION_CHAT_HOST;
+  if (PRODUCTION_TURNSTILE_HOSTS.has(n)) return n;
   return undefined;
 }
 

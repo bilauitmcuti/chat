@@ -1,6 +1,8 @@
 "use client";
 
 import { useState, useRef, useEffect, useLayoutEffect, useCallback, useMemo, useSyncExternalStore } from "react";
+import { HugeiconsIcon } from "@hugeicons/react";
+import { ArrowLeft01Icon } from "@hugeicons/core-free-icons";
 import { useCalendarHydrationVersion } from "@/components/calendar-hydration-context";
 import { getSnapshot, subscribe } from "@/lib/calendar-store";
 import {
@@ -119,7 +121,9 @@ export default function ChatPage() {
       : getVisibleChatModels("chat.bilauitmcuti.com")
   );
   const [activeSubmenu, setActiveSubmenu] = useState<string | null>(null);
+  const [headerVisible, setHeaderVisible] = useState(true);
   const keepDropdownOpenRef = useRef(false);
+  const lastScrollTop = useRef(0);
   const selectionRef = useRef({
     program: selectedProgram,
     sessionsByProgram,
@@ -420,14 +424,30 @@ export default function ChatPage() {
   }, [input, adjustTextareaHeight]);
 
   const handleViewportScroll = useCallback(
-    (_event: React.UIEvent<HTMLDivElement>) => {
+    (event: React.UIEvent<HTMLDivElement>) => {
+      const el = event.currentTarget;
+      const currentScrollTop = el.scrollTop;
       if (dropdownOpen) {
         setDropdownOpen(false);
         setActiveSubmenu(null);
       }
+      if (currentScrollTop <= 10 || currentScrollTop < lastScrollTop.current) {
+        setHeaderVisible(true);
+      } else if (currentScrollTop > lastScrollTop.current) {
+        setHeaderVisible(false);
+      }
+      lastScrollTop.current = currentScrollTop;
     },
     [dropdownOpen]
   );
+
+  const handleBack = useCallback(() => {
+    if (window.history.length > 1) {
+      window.history.back();
+      return;
+    }
+    window.location.assign("https://bilauitmcuti.com/");
+  }, []);
 
   const sendMessage = useCallback(async (text: string) => {
     const trimmed = text.trim();
@@ -1109,6 +1129,22 @@ export default function ChatPage() {
 
   return (
     <div className="relative flex h-dvh flex-col overflow-hidden bg-background text-foreground" data-nosnippet>
+      <div
+        className={`chat-header absolute top-0 left-0 right-0 z-10 px-4 md:px-0 ${
+          headerVisible ? "translate-y-0" : "-translate-y-full"
+        }`}
+      >
+        <header className="flex items-center gap-3 pt-8 pb-3 mx-auto max-w-[600px] w-full">
+          <button
+            type="button"
+            onClick={handleBack}
+            className="flex items-center justify-center w-9 h-9 rounded-full bg-secondary hover:opacity-80"
+            aria-label="Back To Home"
+          >
+            <HugeiconsIcon icon={ArrowLeft01Icon} strokeWidth={2} className="w-5 h-5" />
+          </button>
+        </header>
+      </div>
       <div className="flex min-h-0 min-w-0 flex-1 flex-col overflow-hidden px-1 md:px-0">
         {isEmptyChat ? (
           <>

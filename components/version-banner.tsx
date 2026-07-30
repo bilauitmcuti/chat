@@ -27,7 +27,7 @@ export function VersionBanner() {
 
     async function checkVersion() {
       try {
-        const res = await fetch("/api/version", { cache: "no-store" });
+        const res = await fetch("/chat/api/version", { cache: "no-store" });
         if (!res.ok) return;
         const { buildId } = (await res.json()) as VersionResponse;
         if (buildId && buildId !== INITIAL_BUILD_ID) {

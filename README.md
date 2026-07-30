@@ -4,7 +4,7 @@
 
 AI chat for UiTM academic calendar questions — ask in English or Malay and get clear, dated answers.
 
-**Live:** [chat.bilauitmcuti.com](https://chat.bilauitmcuti.com)
+**Live:** [chat.bilauitmcuti.com](https://chat.bilauitmcuti.com) (also [bilauitmcuti.com/chat](https://bilauitmcuti.com/chat) on the main domain)
 
 Part of [Bila UiTM Cuti](https://bilauitmcuti.com) — the companion chat (sometimes called **UiTM Assistant** / **AI Chat UiTM**) helps students check semester dates, lecture weeks, fee deferment windows, holidays, exams, and related UiTM info in a short conversation.
 
@@ -63,7 +63,7 @@ Function calling lets the assistant look up the right academic facts before answ
 4. Replies are validated before they are shown.
 5. Optional thumbs up/down help improve the product.
 
-Runs in production on Cloudflare Workers at [chat.bilauitmcuti.com](https://chat.bilauitmcuti.com).
+Runs in production on Cloudflare Workers at [chat.bilauitmcuti.com](https://chat.bilauitmcuti.com) (root `/`) and under [bilauitmcuti.com/chat](https://bilauitmcuti.com/chat) on the calendar domain. Apex DNS stays on Pages; only the `/chat*` path is routed to this Worker (never apex `/_next/*`).
 
 ## Related
 

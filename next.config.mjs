@@ -31,23 +31,11 @@ const nextConfig = {
   images: {
     unoptimized: true,
   },
+  /** Dual-host: assets load from /chat/_next on apex and subdomain; middleware rewrites to /_next. */
+  assetPrefix: "/chat",
   compress: true,
   poweredByHeader: false,
   reactStrictMode: true,
-  async redirects() {
-    return [
-      {
-        source: "/chat",
-        destination: "/",
-        permanent: true,
-      },
-      {
-        source: "/chat/",
-        destination: "/",
-        permanent: true,
-      },
-    ];
-  },
   async headers() {
     const securityHeaders = [
       ...NEXT_CONFIG_EXTRA_HEADER_ENTRIES,

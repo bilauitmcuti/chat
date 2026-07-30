@@ -158,9 +158,9 @@ export function ChatComposer({
     waitForTurnstileConfig ||
     (requiresTurnstile && !turnstileToken.trim());
 
-  /** Lighter than color-mix-with-foreground; uses --input (≠ --secondary composer). */
+  /** Match hover to pressed: --input (visible on secondary). Beat ghost dark:hover:bg-muted/50. */
   const selectorTriggerClassName =
-    "text-primary border-none bg-transparent shadow-none px-2 rounded-lg font-medium hover:bg-input hover:text-primary aria-expanded:bg-input aria-expanded:text-primary";
+    "text-primary border-none bg-transparent shadow-none px-2 rounded-lg font-medium hover:bg-input hover:text-primary dark:hover:bg-input aria-expanded:bg-input aria-expanded:text-primary dark:aria-expanded:bg-input";
 
   return (
     <div

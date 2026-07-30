@@ -3,7 +3,7 @@
 import type { Dispatch, SetStateAction } from "react";
 import { useRef } from "react";
 import { HugeiconsIcon } from "@hugeicons/react";
-import { ArrowUp01Icon, ArrowUp02Icon, ArrowDown01Icon } from "@hugeicons/core-free-icons";
+import { ArrowUp02Icon } from "@hugeicons/core-free-icons";
 import type { SessionId } from "@/lib/data";
 import { getSessionOptionsForGroup } from "@/lib/data";
 import type { ProgramValue } from "@/lib/route-utils";
@@ -94,7 +94,12 @@ interface ChatComposerProps {
     selectedProgram: ProgramValue,
     selectedSessions: SessionId[]
   ) => string;
-  chatModels: readonly { id: string; name: string; provider: string }[];
+  chatModels: readonly {
+    id: string;
+    name: string;
+    description: string;
+    provider: string;
+  }[];
   selectedModelId: string;
   selectedModelLabel: string;
   modelDropdownOpen: boolean;
@@ -277,18 +282,13 @@ export function ChatComposer({
                       type="button"
                       variant="ghost"
                       size="sm"
-                      className="h-8 min-w-0 max-w-[180px] sm:max-w-[260px] md:max-w-[300px] overflow-hidden text-primary border-none bg-transparent shadow-none px-2 gap-1 rounded-lg font-medium hover:bg-[color-mix(in_oklch,var(--accent),var(--foreground)_8%)] hover:text-primary dark:hover:bg-[color-mix(in_oklch,var(--accent),var(--foreground)_12%)] aria-expanded:bg-[color-mix(in_oklch,var(--accent),var(--foreground)_8%)] dark:aria-expanded:bg-[color-mix(in_oklch,var(--accent),var(--foreground)_12%)] aria-expanded:text-primary"
+                      className="h-8 min-w-0 max-w-[180px] sm:max-w-[260px] md:max-w-[300px] overflow-hidden text-primary border-none bg-transparent shadow-none px-2 rounded-lg font-medium hover:bg-[color-mix(in_oklch,var(--accent),var(--foreground)_8%)] hover:text-primary dark:hover:bg-[color-mix(in_oklch,var(--accent),var(--foreground)_12%)] aria-expanded:bg-[color-mix(in_oklch,var(--accent),var(--foreground)_8%)] dark:aria-expanded:bg-[color-mix(in_oklch,var(--accent),var(--foreground)_12%)] aria-expanded:text-primary"
                     />
                   }
                 >
                     <span className="block min-w-0 flex-1 truncate text-left text-sm text-primary md:text-[0.9375rem]">
                       {currentProgramLabel}
                     </span>
-                    {dropdownOpen ? (
-                      <HugeiconsIcon icon={ArrowUp01Icon} strokeWidth={2} className="opacity-50 shrink-0" />
-                    ) : (
-                      <HugeiconsIcon icon={ArrowDown01Icon} strokeWidth={2} className="opacity-50 shrink-0" />
-                    )}
                 </DropdownMenuTrigger>
                 <DropdownMenuContent
                   className="min-w-[260px] overflow-visible pt-4 pb-4 pl-3 pr-3 bg-popover dark:bg-[#2A2A2A]"
@@ -479,7 +479,7 @@ export function ChatComposer({
                   </div>
                 </DropdownMenuContent>
               </DropdownMenu>
-              <div className="flex items-center gap-1 shrink-0">
+              <div className="flex min-w-0 items-center gap-1 shrink">
                 <DropdownMenu
                   open={modelDropdownOpen}
                   onOpenChange={onModelDropdownOpenChange}
@@ -490,39 +490,39 @@ export function ChatComposer({
                         type="button"
                         variant="ghost"
                         size="sm"
-                        className="h-8 shrink-0 text-primary border-none bg-transparent shadow-none px-2 gap-1 rounded-lg font-medium hover:bg-[color-mix(in_oklch,var(--accent),var(--foreground)_8%)] hover:text-primary dark:hover:bg-[color-mix(in_oklch,var(--accent),var(--foreground)_12%)] aria-expanded:bg-[color-mix(in_oklch,var(--accent),var(--foreground)_8%)] dark:aria-expanded:bg-[color-mix(in_oklch,var(--accent),var(--foreground)_12%)] aria-expanded:text-primary"
+                        className="h-8 min-w-0 max-w-[140px] sm:max-w-[180px] overflow-hidden text-primary border-none bg-transparent shadow-none px-2 rounded-lg font-medium hover:bg-[color-mix(in_oklch,var(--accent),var(--foreground)_8%)] hover:text-primary dark:hover:bg-[color-mix(in_oklch,var(--accent),var(--foreground)_12%)] aria-expanded:bg-[color-mix(in_oklch,var(--accent),var(--foreground)_8%)] dark:aria-expanded:bg-[color-mix(in_oklch,var(--accent),var(--foreground)_12%)] aria-expanded:text-primary"
                       />
                     }
                   >
-                    <span className="whitespace-nowrap text-left text-xs text-primary sm:text-sm">
+                    <span className="block min-w-0 truncate text-left text-sm text-primary md:text-[0.9375rem]">
                       {selectedModelLabel}
                     </span>
-                    {modelDropdownOpen ? (
-                      <HugeiconsIcon icon={ArrowUp01Icon} strokeWidth={2} className="opacity-50 shrink-0 size-3.5" />
-                    ) : (
-                      <HugeiconsIcon icon={ArrowDown01Icon} strokeWidth={2} className="opacity-50 shrink-0 size-3.5" />
-                    )}
                   </DropdownMenuTrigger>
                   <DropdownMenuContent
-                    className="min-w-[220px] pt-3 pb-3 pl-2 pr-2 bg-popover dark:bg-[#2A2A2A]"
+                    className="min-w-[240px] pt-3 pb-3 pl-2 pr-2 bg-popover dark:bg-[#2A2A2A]"
                     align="end"
                   >
                     {chatModels.map((model) => (
                       <DropdownMenuItem
                         key={model.id}
                         className={cn(
-                          "relative cursor-pointer flex items-center gap-2 py-2 pr-8",
+                          "relative cursor-pointer flex items-start gap-2 py-2 pr-8",
                           model.id === selectedModelId ? "text-primary" : ""
                         )}
                         onClick={() => onModelSelect(model.id)}
                       >
                         <ModelSelectorLogo
                           provider={model.provider}
-                          className="size-4 shrink-0"
+                          className="size-4 shrink-0 mt-0.5"
                         />
-                        <ModelSelectorName className="font-medium text-sm">
-                          {model.name}
-                        </ModelSelectorName>
+                        <div className="flex min-w-0 flex-1 flex-col gap-0.5 text-left">
+                          <ModelSelectorName className="font-medium text-sm">
+                            {model.name}
+                          </ModelSelectorName>
+                          <span className="text-xs text-muted-foreground leading-snug">
+                            {model.description}
+                          </span>
+                        </div>
                         {model.id === selectedModelId ? (
                           <span
                             className="pointer-events-none absolute right-2 top-1/2 -translate-y-1/2 flex size-3 shrink-0 items-center justify-center rounded-full border border-primary bg-primary"
@@ -538,7 +538,7 @@ export function ChatComposer({
                 variant="default"
                 size="icon-sm"
                 disabled={sendDisabled}
-                className="rounded-full bg-primary text-primary-foreground hover:bg-primary/90 disabled:opacity-30"
+                className="rounded-full bg-primary text-primary-foreground hover:bg-primary/90 disabled:opacity-30 shrink-0"
                 aria-label="Send message"
               >
                 <HugeiconsIcon icon={ArrowUp02Icon} strokeWidth={2} />

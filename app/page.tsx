@@ -55,7 +55,7 @@ import {
   supportsReasoningUi,
   writeStoredChatModel,
 } from "@/lib/chat/models";
-import { CHAT_STREAM_PHASE } from "@/lib/chat/stream-phase";
+import { ASSISTANT_LIFECYCLE, CHAT_STREAM_PHASE } from "@/lib/chat/stream-phase";
 import {
   getInitialChatSessions,
   isChatSelectionInSyncWithHomepage,
@@ -455,6 +455,7 @@ export default function ChatPage() {
       timestamp: now,
       userPrompt: trimmed,
       reasoningUiSupported: supportsReasoningUi(modelIdForTurn),
+      lifecycle: ASSISTANT_LIFECYCLE.SUBMITTED,
     };
 
     setMessages([...messages, userMessage, assistantPlaceholder]);
@@ -471,13 +472,16 @@ export default function ChatPage() {
         setMessages((prev) =>
           prev.map((m) =>
             m.id === assistantId
-              ? {
-                  ...m,
-                  content:
-                    "Tiada sambungan internet. Semak rangkaian anda dan cuba lagi. / No internet connection. Check your network and try again.",
-                  timestamp: offlineNow,
-                  isComplete: true,
-                }
+                ? {
+                    ...m,
+                    content:
+                      "Tiada sambungan internet. Semak rangkaian anda dan cuba lagi. / No internet connection. Check your network and try again.",
+                    timestamp: offlineNow,
+                    isComplete: true,
+                    lifecycle: ASSISTANT_LIFECYCLE.ERROR,
+                    streamPhase: undefined,
+                    statusMessage: undefined,
+                  }
               : m
           )
         );
@@ -569,6 +573,7 @@ export default function ChatPage() {
                         m.id === assistantId
                           ? withThinkingMetadata({
                               ...m,
+                              lifecycle: ASSISTANT_LIFECYCLE.STREAMING,
                               streamPhase: undefined,
                               statusMessage: undefined,
                             })
@@ -585,6 +590,10 @@ export default function ChatPage() {
                       m.id === assistantId
                         ? {
                             ...m,
+                            lifecycle:
+                              payload.phase === CHAT_STREAM_PHASE.RETRY
+                                ? ASSISTANT_LIFECYCLE.SUBMITTED
+                                : ASSISTANT_LIFECYCLE.TOOL_CALL,
                             streamPhase: payload.phase,
                             statusMessage: payload.message,
                           }
@@ -603,6 +612,7 @@ export default function ChatPage() {
                             ...m,
                             content: "",
                             reasoning: undefined,
+                            lifecycle: ASSISTANT_LIFECYCLE.SUBMITTED,
                             streamPhase: payload.phase ?? CHAT_STREAM_PHASE.RETRY,
                             statusMessage: payload.message,
                           }
@@ -631,6 +641,7 @@ export default function ChatPage() {
                           userPrompt: trimmed,
                           isComplete: true,
                           timestamp: doneAt,
+                          lifecycle: ASSISTANT_LIFECYCLE.COMPLETE,
                         },
                       ];
                     }
@@ -645,6 +656,7 @@ export default function ChatPage() {
                           userPrompt: trimmed,
                           isComplete: true,
                           timestamp: m.timestamp ?? doneAt,
+                          lifecycle: ASSISTANT_LIFECYCLE.COMPLETE,
                           streamPhase: undefined,
                           statusMessage: undefined,
                         },
@@ -680,7 +692,14 @@ export default function ChatPage() {
               setMessages((prev) =>
                 prev.map((m) =>
                   m.id === assistantId
-                    ? { ...m, content: "", isComplete: false }
+                    ? {
+                        ...m,
+                        content: "",
+                        isComplete: false,
+                        lifecycle: ASSISTANT_LIFECYCLE.SUBMITTED,
+                        streamPhase: undefined,
+                        statusMessage: undefined,
+                      }
                     : m
                 )
               );
@@ -729,6 +748,9 @@ export default function ChatPage() {
                       userPrompt: trimmed,
                       isComplete: true,
                       timestamp: doneAt,
+                      lifecycle: ASSISTANT_LIFECYCLE.COMPLETE,
+                      streamPhase: undefined,
+                      statusMessage: undefined,
                     }
                   : m
               )
@@ -777,6 +799,9 @@ export default function ChatPage() {
                     content: errorContent,
                     timestamp: assistantNow,
                     isComplete: true,
+                    lifecycle: ASSISTANT_LIFECYCLE.ERROR,
+                    streamPhase: undefined,
+                    statusMessage: undefined,
                   }
                 : m
             );
@@ -789,6 +814,7 @@ export default function ChatPage() {
               content: errorContent,
               timestamp: assistantNow,
               isComplete: true,
+              lifecycle: ASSISTANT_LIFECYCLE.ERROR,
             },
           ];
         });
@@ -807,6 +833,8 @@ export default function ChatPage() {
         role: "assistant",
         content: "Something went wrong. Please try again.",
         timestamp: errorNow,
+        isComplete: true,
+        lifecycle: ASSISTANT_LIFECYCLE.ERROR,
       };
       setStreamingDraft(null);
       setMessages((prev) => [...prev, errorMessage]);

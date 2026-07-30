@@ -4,6 +4,7 @@ import {
   CHAT_MODEL_LLAMA_32,
   CHAT_MODEL_LLAMA_4_SCOUT,
   CHAT_MODEL_MISTRAL_SMALL,
+  CHAT_MODELS,
   DEFAULT_CHAT_MODEL,
   getModelMaxOutputTokens,
   getVisibleChatModels,
@@ -31,7 +32,6 @@ describe("resolveChatModel", () => {
   });
 
   it("uses allowlisted client model when provided", () => {
-    expect(resolveChatModel(CHAT_MODEL_LLAMA_32, "localhost")).toBe(CHAT_MODEL_LLAMA_32);
     expect(resolveChatModel(CHAT_MODEL_LLAMA_4_SCOUT)).toBe(CHAT_MODEL_LLAMA_4_SCOUT);
     expect(resolveChatModel(CHAT_MODEL_MISTRAL_SMALL)).toBe(CHAT_MODEL_MISTRAL_SMALL);
     expect(resolveChatModel("@cf/moonshotai/kimi-k2.6")).toBe("@cf/moonshotai/kimi-k2.6");
@@ -41,31 +41,38 @@ describe("resolveChatModel", () => {
     expect(resolveChatModel("@cf/unknown/model")).toBe(DEFAULT_CHAT_MODEL);
   });
 
-  it("falls back when Llama 3.2 is requested on production", () => {
+  it("falls back when Llama 3.2 is requested (excluded from picker)", () => {
+    expect(resolveChatModel(CHAT_MODEL_LLAMA_32, "localhost")).toBe(
+      DEFAULT_CHAT_MODEL
+    );
     expect(resolveChatModel(CHAT_MODEL_LLAMA_32, PRODUCTION_CHAT_HOST)).toBe(
       DEFAULT_CHAT_MODEL
     );
   });
 
   it("respects WORKERS_AI_MODEL when allowlisted", () => {
+    vi.stubEnv("WORKERS_AI_MODEL", CHAT_MODEL_LLAMA_4_SCOUT);
+    expect(resolveChatModel(undefined, "localhost")).toBe(CHAT_MODEL_LLAMA_4_SCOUT);
+  });
+
+  it("ignores WORKERS_AI_MODEL when excluded from catalog", () => {
     vi.stubEnv("WORKERS_AI_MODEL", CHAT_MODEL_LLAMA_32);
-    expect(resolveChatModel(undefined, "localhost")).toBe(CHAT_MODEL_LLAMA_32);
+    expect(resolveChatModel(undefined, "localhost")).toBe(DEFAULT_CHAT_MODEL);
   });
 });
 
 describe("isAllowedChatModel", () => {
-  it("allows all catalog models on localhost", () => {
+  it("allows catalog models", () => {
     expect(isAllowedChatModel(CHAT_MODEL_GEMMA_4)).toBe(true);
-    expect(isAllowedChatModel(CHAT_MODEL_LLAMA_32, "localhost")).toBe(true);
     expect(isAllowedChatModel(CHAT_MODEL_LLAMA_4_SCOUT)).toBe(true);
     expect(isAllowedChatModel(CHAT_MODEL_MISTRAL_SMALL)).toBe(true);
     expect(isAllowedChatModel("@cf/zai-org/glm-5.2")).toBe(true);
     expect(isAllowedChatModel("invalid")).toBe(false);
   });
 
-  it("blocks Llama 3.2 on production host", () => {
+  it("blocks Llama 3.2 everywhere", () => {
+    expect(isAllowedChatModel(CHAT_MODEL_LLAMA_32, "localhost")).toBe(false);
     expect(isAllowedChatModel(CHAT_MODEL_LLAMA_32, PRODUCTION_CHAT_HOST)).toBe(false);
-    expect(isAllowedChatModel(CHAT_MODEL_LLAMA_4_SCOUT, PRODUCTION_CHAT_HOST)).toBe(true);
   });
 });
 
@@ -77,13 +84,20 @@ describe("getVisibleChatModels / isNonProductionChatHost", () => {
     expect(isNonProductionChatHost(PRODUCTION_CHAT_HOST)).toBe(false);
   });
 
-  it("hides Llama 3.2 from production picker", () => {
+  it("excludes Llama 3.2 from the picker on all hosts", () => {
     const prod = getVisibleChatModels(PRODUCTION_CHAT_HOST).map((m) => m.id);
     const local = getVisibleChatModels("localhost").map((m) => m.id);
     expect(prod).not.toContain(CHAT_MODEL_LLAMA_32);
-    expect(local).toContain(CHAT_MODEL_LLAMA_32);
+    expect(local).not.toContain(CHAT_MODEL_LLAMA_32);
     expect(prod).toContain(CHAT_MODEL_LLAMA_4_SCOUT);
     expect(prod).toContain(CHAT_MODEL_MISTRAL_SMALL);
+    expect(prod).toHaveLength(CHAT_MODELS.length);
+  });
+
+  it("includes descriptions for every visible model", () => {
+    for (const model of getVisibleChatModels()) {
+      expect(model.description.trim().length).toBeGreaterThan(0);
+    }
   });
 });
 
@@ -95,7 +109,6 @@ describe("getModelMaxOutputTokens", () => {
   });
 
   it("applies per-model ceilings", () => {
-    expect(getModelMaxOutputTokens(CHAT_MODEL_LLAMA_32)).toBe(2048);
     expect(getModelMaxOutputTokens("@cf/moonshotai/kimi-k2.6")).toBe(4096);
     expect(getModelMaxOutputTokens("@cf/zai-org/glm-5.2")).toBe(4096);
     expect(getModelMaxOutputTokens("@cf/nvidia/nemotron-3-120b-a12b")).toBe(4096);
@@ -103,11 +116,12 @@ describe("getModelMaxOutputTokens", () => {
 
   it("falls back to the global ceiling for unknown model ids", () => {
     expect(getModelMaxOutputTokens("@cf/unknown/model")).toBe(8192);
+    expect(getModelMaxOutputTokens(CHAT_MODEL_LLAMA_32)).toBe(8192);
   });
 });
 
 describe("supportsFunctionCalling", () => {
-  it("enables FC for Gemma and new frontier models", () => {
+  it("enables FC for all picker models", () => {
     expect(supportsFunctionCalling(CHAT_MODEL_GEMMA_4)).toBe(true);
     expect(supportsFunctionCalling(CHAT_MODEL_LLAMA_4_SCOUT)).toBe(true);
     expect(supportsFunctionCalling(CHAT_MODEL_MISTRAL_SMALL)).toBe(true);
@@ -116,7 +130,7 @@ describe("supportsFunctionCalling", () => {
     expect(supportsFunctionCalling("@cf/nvidia/nemotron-3-120b-a12b")).toBe(true);
   });
 
-  it("disables FC for Llama 3.2", () => {
+  it("disables FC for excluded Llama 3.2", () => {
     expect(supportsFunctionCalling(CHAT_MODEL_LLAMA_32)).toBe(false);
     expect(modelSupportsFunctionCalling(CHAT_MODEL_LLAMA_32)).toBe(false);
   });
@@ -130,7 +144,7 @@ describe("supportsReasoningUi", () => {
     expect(supportsReasoningUi("@cf/moonshotai/kimi-k2.6")).toBe(true);
   });
 
-  it("disables reasoning UI for Llama and Mistral Small", () => {
+  it("disables reasoning UI for Scout and Mistral Small", () => {
     expect(supportsReasoningUi(CHAT_MODEL_LLAMA_32)).toBe(false);
     expect(supportsReasoningUi(CHAT_MODEL_LLAMA_4_SCOUT)).toBe(false);
     expect(supportsReasoningUi(CHAT_MODEL_MISTRAL_SMALL)).toBe(false);

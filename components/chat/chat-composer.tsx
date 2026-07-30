@@ -158,6 +158,10 @@ export function ChatComposer({
     waitForTurnstileConfig ||
     (requiresTurnstile && !turnstileToken.trim());
 
+  /** Lighter than color-mix-with-foreground; uses --input (≠ --secondary composer). */
+  const selectorTriggerClassName =
+    "text-primary border-none bg-transparent shadow-none px-2 rounded-lg font-medium hover:bg-input hover:text-primary aria-expanded:bg-input aria-expanded:text-primary";
+
   return (
     <div
       className={cn(
@@ -282,7 +286,10 @@ export function ChatComposer({
                       type="button"
                       variant="ghost"
                       size="sm"
-                      className="h-8 min-w-0 max-w-[180px] sm:max-w-[260px] md:max-w-[300px] overflow-hidden text-primary border-none bg-transparent shadow-none px-2 rounded-lg font-medium hover:bg-[color-mix(in_oklch,var(--accent),var(--foreground)_8%)] hover:text-primary dark:hover:bg-[color-mix(in_oklch,var(--accent),var(--foreground)_12%)] aria-expanded:bg-[color-mix(in_oklch,var(--accent),var(--foreground)_8%)] dark:aria-expanded:bg-[color-mix(in_oklch,var(--accent),var(--foreground)_12%)] aria-expanded:text-primary"
+                      className={cn(
+                        "h-8 min-w-0 max-w-[180px] sm:max-w-[260px] md:max-w-[300px] overflow-hidden",
+                        selectorTriggerClassName
+                      )}
                     />
                   }
                 >
@@ -490,7 +497,10 @@ export function ChatComposer({
                         type="button"
                         variant="ghost"
                         size="sm"
-                        className="h-8 min-w-0 max-w-[140px] sm:max-w-[180px] overflow-hidden text-primary border-none bg-transparent shadow-none px-2 rounded-lg font-medium hover:bg-[color-mix(in_oklch,var(--accent),var(--foreground)_8%)] hover:text-primary dark:hover:bg-[color-mix(in_oklch,var(--accent),var(--foreground)_12%)] aria-expanded:bg-[color-mix(in_oklch,var(--accent),var(--foreground)_8%)] dark:aria-expanded:bg-[color-mix(in_oklch,var(--accent),var(--foreground)_12%)] aria-expanded:text-primary"
+                        className={cn(
+                          "h-8 min-w-0 max-w-[140px] sm:max-w-[180px] overflow-hidden",
+                          selectorTriggerClassName
+                        )}
                       />
                     }
                   >
@@ -499,7 +509,7 @@ export function ChatComposer({
                     </span>
                   </DropdownMenuTrigger>
                   <DropdownMenuContent
-                    className="min-w-[240px] pt-3 pb-3 pl-2 pr-2 bg-popover dark:bg-[#2A2A2A]"
+                    className="min-w-[260px] pt-4 pb-4 pl-3 pr-3 bg-popover dark:bg-[#2A2A2A]"
                     align="end"
                   >
                     {chatModels.map((model) => (

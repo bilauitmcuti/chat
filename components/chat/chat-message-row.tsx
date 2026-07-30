@@ -91,8 +91,8 @@ export function ChatMessageRow({
     message.timestamp
   );
 
-  const showThinkingUi =
-    isThinkingPhase && showThinking;
+  // Pending until answer text exists — clears on first painted content or error.
+  const showThinkingUi = isThinkingPhase && showThinking;
   const showLiveRegenerating = isRegenerating && Boolean(progressLabel);
   const liveDurationSec = useLiveDurationSec(
     message.timestamp,
@@ -100,11 +100,16 @@ export function ChatMessageRow({
   );
   const resolvedDurationSec = message.thinkingDurationSec ?? liveDurationSec;
   const isMinimalTurn = isMinimalConversationalMessage(message.userPrompt ?? "");
-  /** Thinking shimmer only — no reasoning paragraphs (must not block the answer). */
-  const showThoughtHeader =
+  /**
+   * Pending shimmer for every supported model as soon as the turn is submitted.
+   * Reasoning paragraphs (if any) stay gated by reasoningUiSupported + non-minimal.
+   */
+  const showPendingHeader = showThinkingUi || showLiveRegenerating;
+  const showReasoningCapableHeader =
     message.reasoningUiSupported !== false &&
     !isMinimalTurn &&
-    (showThinkingUi || showLiveRegenerating);
+    Boolean(message.reasoning?.trim());
+  const showThoughtHeader = showPendingHeader || showReasoningCapableHeader;
 
   const enterAnimation =
     message.role === "user"

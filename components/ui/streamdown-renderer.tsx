@@ -5,8 +5,8 @@ import { Streamdown } from "streamdown";
 import "streamdown/styles.css";
 import { Component, type ReactNode, useSyncExternalStore } from "react";
 
+import { ScrollArea } from "@/components/ui/scroll-area";
 import {
-  Table,
   TableBody,
   TableCell,
   TableHead,
@@ -15,6 +15,9 @@ import {
 } from "@/components/ui/table";
 import { contentToMarkdown } from "@/lib/chat/markdown-suitability";
 import { cn } from "@/lib/utils";
+
+const TABLE_CELL_MAX =
+  "h-auto min-h-10 max-w-[12rem] sm:max-w-[16rem] whitespace-normal break-words align-top";
 
 export interface StreamdownRendererProps {
   content: string;
@@ -139,16 +142,27 @@ const COMPONENTS: Components = {
   img: () => null,
   table: ({ children }) => (
     <div className="not-typeset mt-2 overflow-hidden rounded-lg border border-border first:mt-0">
-      <Table>{children}</Table>
+      <ScrollArea className="w-full">
+        <table
+          data-slot="table"
+          className="w-max min-w-full caption-bottom text-sm"
+        >
+          {children}
+        </table>
+      </ScrollArea>
     </div>
   ),
   thead: ({ children }) => <TableHeader>{children}</TableHeader>,
   tbody: ({ children }) => <TableBody>{children}</TableBody>,
   tr: ({ children }) => <TableRow>{children}</TableRow>,
   th: ({ children }) => (
-    <TableHead className="text-xs font-semibold">{children}</TableHead>
+    <TableHead className={cn("text-xs font-semibold", TABLE_CELL_MAX)}>
+      {children}
+    </TableHead>
   ),
-  td: ({ children }) => <TableCell className="text-xs">{children}</TableCell>,
+  td: ({ children }) => (
+    <TableCell className={cn("text-xs", TABLE_CELL_MAX)}>{children}</TableCell>
+  ),
 };
 
 export function StreamdownRenderer({

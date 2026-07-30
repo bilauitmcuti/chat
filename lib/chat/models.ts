@@ -2,6 +2,7 @@ import { CHAT_MAX_MESSAGE_LENGTH } from "@/lib/chat/limits";
 
 export const DEFAULT_CHAT_MODEL = "@cf/google/gemma-4-26b-a4b-it" as const;
 export const CHAT_MODEL_GEMMA_4 = DEFAULT_CHAT_MODEL;
+/** @deprecated Removed from picker — no function calling or reasoning. Kept for tests/compat. */
 export const CHAT_MODEL_LLAMA_32 = "@cf/meta/llama-3.2-3b-instruct" as const;
 export const CHAT_MODEL_LLAMA_4_SCOUT =
   "@cf/meta/llama-4-scout-17b-16e-instruct" as const;
@@ -14,6 +15,8 @@ export const PRODUCTION_CHAT_HOST = "chat.bilauitmcuti.com";
 export interface ChatModelOption {
   id: string;
   name: string;
+  /** Short menu subtitle under the model name. */
+  description: string;
   /** models.dev / ModelSelectorLogo provider slug */
   provider: string;
   functionCalling: boolean;
@@ -28,6 +31,7 @@ export const CHAT_MODELS: readonly ChatModelOption[] = [
   {
     id: CHAT_MODEL_GEMMA_4,
     name: "Gemma 4",
+    description: "Best for most questions",
     provider: "google",
     functionCalling: true,
     reasoningUi: true,
@@ -35,22 +39,15 @@ export const CHAT_MODELS: readonly ChatModelOption[] = [
   {
     id: CHAT_MODEL_LLAMA_4_SCOUT,
     name: "Llama 4 Scout",
+    description: "For quick, straightforward answers",
     provider: "llama",
     functionCalling: true,
     reasoningUi: false,
   },
   {
-    id: CHAT_MODEL_LLAMA_32,
-    name: "Llama 3.2 3B",
-    provider: "llama",
-    functionCalling: false,
-    reasoningUi: false,
-    maxOutputTokens: 2048,
-    nonProductionOnly: true,
-  },
-  {
     id: CHAT_MODEL_MISTRAL_SMALL,
     name: "Mistral Small 3.1",
+    description: "Reliable for everyday conversations",
     provider: "mistral",
     functionCalling: true,
     reasoningUi: false,
@@ -58,6 +55,7 @@ export const CHAT_MODELS: readonly ChatModelOption[] = [
   {
     id: "@cf/moonshotai/kimi-k2.6",
     name: "Kimi K2.6",
+    description: "For complex, multi-step tasks",
     provider: "moonshotai",
     functionCalling: true,
     reasoningUi: true,
@@ -66,6 +64,7 @@ export const CHAT_MODELS: readonly ChatModelOption[] = [
   {
     id: "@cf/zai-org/glm-5.2",
     name: "GLM 5.2",
+    description: "For long, detailed questions",
     provider: "zai",
     functionCalling: true,
     reasoningUi: true,
@@ -74,6 +73,7 @@ export const CHAT_MODELS: readonly ChatModelOption[] = [
   {
     id: "@cf/nvidia/nemotron-3-120b-a12b",
     name: "Nemotron 3 Super",
+    description: "For deeper reasoning",
     provider: "nvidia",
     functionCalling: true,
     reasoningUi: true,

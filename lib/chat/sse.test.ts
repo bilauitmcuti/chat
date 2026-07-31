@@ -61,6 +61,47 @@ describe("createMarkdownStreamPainter", () => {
     expect(chunks).toEqual(["Hello world!"]);
   });
 
+  it("holds a leading list marker until its text arrives", () => {
+    const chunks: string[] = [];
+    const painter = createMarkdownStreamPainter((c) => chunks.push(c), {
+      maxChunkChars: 8,
+      firstFlushChars: 2,
+    });
+    painter.push("- ");
+    expect(chunks).toEqual([]);
+    painter.push("Cuti ");
+    painter.push("panjang");
+    painter.flush();
+    expect(chunks[0]?.startsWith("- Cuti")).toBe(true);
+    expect(chunks.join("")).toBe("- Cuti panjang");
+  });
+
+  it("paints prose before a dangling marker but keeps the marker buffered", () => {
+    const chunks: string[] = [];
+    const painter = createMarkdownStreamPainter((c) => chunks.push(c), {
+      maxChunkChars: 64,
+      firstFlushChars: 12,
+    });
+    painter.push("Ada dua perkara.\n");
+    painter.push("1. ");
+    expect(chunks).toEqual(["Ada dua perkara.\n"]);
+    painter.push("Cuti semester");
+    painter.flush();
+    expect(chunks.join("")).toBe("Ada dua perkara.\n1. Cuti semester");
+  });
+
+  it("holds a heading marker until its text arrives", () => {
+    const chunks: string[] = [];
+    const painter = createMarkdownStreamPainter((c) => chunks.push(c), {
+      maxChunkChars: 8,
+      firstFlushChars: 2,
+    });
+    painter.push("## ");
+    expect(chunks).toEqual([]);
+    painter.push("Tarikh penting");
+    expect(chunks.join("").startsWith("## Tarikh")).toBe(true);
+  });
+
   it("resets buffered partial without painting it", () => {
     const chunks: string[] = [];
     const painter = createMarkdownStreamPainter((c) => chunks.push(c), {

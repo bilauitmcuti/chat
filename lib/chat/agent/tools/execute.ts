@@ -20,15 +20,16 @@ import {
   buildLectureWeeksTableBlock,
   needsLectureWeekTable,
 } from "@/lib/chat/lecture-week-context";
-import { buildPublicHolidayChatContext } from "@/lib/chat/public-holiday-context";
+import { buildPublicHolidayChatContext, formatPublicHolidayMetaBlock } from "@/lib/chat/public-holiday-context";
 import { buildQueryScopeBlock, buildSessionTimelineBlock } from "@/lib/chat/query-scope";
 import { messageAsksNextUpcomingEvent } from "@/lib/chat/topic-router";
-import { toPromptDate } from "@/lib/chat/dates";
+import { normalizeDateString, toPromptDate } from "@/lib/chat/dates";
 import type { AgentTurnContext, ChatToolName } from "@/lib/chat/agent/types";
 import { truncateToolOutput } from "@/lib/chat/agent/types";
 import { searchUitmKnowledge } from "@/lib/chat/agent/tools/search-uitm-knowledge";
 import { getFilteredGroupBActivities } from "@/lib/chat/context";
-import { getDefaultSessionForGroup } from "@/lib/data";
+import { getDefaultSessionForGroup, type SessionId } from "@/lib/data";
+import { fetchPublicHolidayMeta, fetchTodayStatus } from "@/lib/calendar-api-server";
 
 function parseToolArgs(args: Record<string, unknown>): Record<string, unknown> {
   return args ?? {};
@@ -111,6 +112,19 @@ function matchedActivitiesToRows(matches: import("@/lib/chat/activity-match").Ma
   }));
 }
 
+function resolveAllowedSession(
+  requested: unknown,
+  ctx: AgentTurnContext
+): SessionId | undefined {
+  if (typeof requested !== "string" || !requested.trim()) return undefined;
+  const id = requested.trim() as SessionId;
+  const allowed = new Set<string>([
+    ...ctx.effectiveSessions,
+    ...ctx.contextSessionIds,
+  ]);
+  return allowed.has(id) ? id : undefined;
+}
+
 export async function executeChatTool(
   name: ChatToolName,
   args: Record<string, unknown>,
@@ -127,6 +141,10 @@ export async function executeChatTool(
       return executeGetSessionTimeline(ctx);
     case "get_lecture_weeks":
       return executeGetLectureWeeks(args, ctx);
+    case "get_today_status":
+      return executeGetTodayStatus(args, ctx);
+    case "get_public_holiday_meta":
+      return executeGetPublicHolidayMeta();
     case "get_public_holidays":
       return executeGetPublicHolidays(args, ctx);
     case "search_uitm_knowledge":
@@ -141,8 +159,8 @@ function executeSearchCalendarActivities(
   ctx: AgentTurnContext
 ): string {
   const parsed = parseToolArgs(args);
-  const query = String(parsed.query ?? ctx.message).trim();
-  const searchText = query || ctx.message;
+  const query = String(parsed.query ?? ctx.effectiveQuery ?? ctx.message).trim();
+  const searchText = query || ctx.effectiveQuery || ctx.message;
 
   if (ctx.activityMatches.length > 0 && !parsed.query) {
     const human = formatMatchedActivitiesBlock(ctx.activityMatches);
@@ -309,9 +327,13 @@ async function executeGetLectureWeeks(
   const parsed = parseToolArgs(args);
   const wantTable =
     parsed.full_table === true || needsLectureWeekTable(ctx.message);
+  const sessionOverride = resolveAllowedSession(parsed.session, ctx);
+  const sessionIds = sessionOverride
+    ? [sessionOverride]
+    : ctx.contextSessionIds;
 
   if (wantTable) {
-    const table = await buildLectureWeeksTableBlock(ctx.contextSessionIds);
+    const table = await buildLectureWeeksTableBlock(sessionIds);
     const human =
       table ||
       formatToolMiss({
@@ -324,7 +346,7 @@ async function executeGetLectureWeeks(
       formatStructuredToolOutput([{ mode: "full_table", scope: sessionScopeLine(ctx) }], human)
     );
   }
-  const quick = await buildLectureWeekQuickReference(ctx.contextSessionIds, ctx.todayISO);
+  const quick = await buildLectureWeekQuickReference(sessionIds, ctx.todayISO);
   const human =
     quick ||
     formatToolMiss({
@@ -338,12 +360,90 @@ async function executeGetLectureWeeks(
   );
 }
 
+async function executeGetTodayStatus(
+  args: Record<string, unknown>,
+  ctx: AgentTurnContext
+): Promise<string> {
+  const parsed = parseToolArgs(args);
+  const rawDate = typeof parsed.date === "string" ? parsed.date.trim() : "";
+  const date =
+    rawDate && /^\d{4}-\d{2}-\d{2}$/.test(rawDate)
+      ? normalizeDateString(rawDate)
+      : ctx.todayISO;
+  const sessionOverride = resolveAllowedSession(parsed.session, ctx);
+  const session =
+    sessionOverride ??
+    ctx.effectiveSessions[0] ??
+    ctx.contextSessionIds[0];
+
+  try {
+    const result = await fetchTodayStatus({
+      group: ctx.primaryGroup,
+      date,
+      session,
+      program: ctx.primaryGroup === "B" ? ctx.program : undefined,
+    });
+    const rows = result.matchedActivities.map((a) => ({
+      name: a.name,
+      start: a.startDate ? toPromptDate(a.startDate) : undefined,
+      end: a.endDate ? toPromptDate(a.endDate) : undefined,
+      type: a.type,
+    }));
+    const activityLines =
+      result.matchedActivities.length > 0
+        ? result.matchedActivities.map((a) => {
+            let range = a.startDate ? toPromptDate(a.startDate) : "";
+            if (a.endDate) range += ` to ${toPromptDate(a.endDate)}`;
+            return `- ${a.name}${range ? `: ${range}` : ""} (${a.type})`;
+          })
+        : ["- (no matched activities)"];
+    const human = [
+      `=== TODAY STATUS (${result.date || date}) ===`,
+      `Primary status: ${result.primaryStatus}`,
+      `Statuses: ${result.statuses.join(", ") || "(none)"}`,
+      result.sessionResolved
+        ? `Session: ${result.sessionResolved.id} (${result.sessionResolved.label})`
+        : `Session: ${session ?? "(default)"}`,
+      "Matched activities:",
+      ...activityLines,
+    ].join("\n");
+    return truncateToolOutput(formatStructuredToolOutput(rows, human));
+  } catch {
+    return formatToolMiss({
+      tool: "get_today_status",
+      searched: date,
+      scope: sessionScopeLine(ctx),
+      suggest: "try search_calendar_activities or get_academic_calendar for overlapping rows",
+    });
+  }
+}
+
+async function executeGetPublicHolidayMeta(): Promise<string> {
+  try {
+    const meta = await fetchPublicHolidayMeta();
+    const rows = [
+      { defaultYear: meta.defaultYear },
+      ...meta.stateOptions.map((s) => ({ state: s.value, label: s.label })),
+    ];
+    return truncateToolOutput(
+      formatStructuredToolOutput(rows, formatPublicHolidayMetaBlock(meta))
+    );
+  } catch {
+    return formatToolMiss({
+      tool: "get_public_holiday_meta",
+      searched: "public holiday filter options",
+      scope: "Malaysia public holidays",
+      suggest: "retry get_public_holidays with a clear state or year in the query",
+    });
+  }
+}
+
 async function executeGetPublicHolidays(
   args: Record<string, unknown>,
   ctx: AgentTurnContext
 ): Promise<string> {
   const parsed = parseToolArgs(args);
-  const query = String(parsed.query ?? ctx.message);
+  const query = String(parsed.query ?? ctx.effectiveQuery ?? ctx.message);
   const ph = await buildPublicHolidayChatContext(query, ctx.todayISO, {
     sessionIds: ctx.contextSessionIds,
   });
@@ -355,7 +455,7 @@ async function executeGetPublicHolidays(
         tool: "get_public_holidays",
         searched: query,
         scope: `Malaysia public holidays (today ${ctx.todayISO})`,
-        suggest: "try a specific month, state, or date in the query",
+        suggest: "call get_public_holiday_meta for valid state slugs, then retry with a specific month, state, or date",
       })
     );
   }
@@ -367,6 +467,6 @@ function executeSearchUitmKnowledge(
   ctx: AgentTurnContext
 ): string {
   const parsed = parseToolArgs(args);
-  const query = String(parsed.query ?? ctx.message).trim();
+  const query = String(parsed.query ?? ctx.effectiveQuery ?? ctx.message).trim();
   return searchUitmKnowledge(query);
 }

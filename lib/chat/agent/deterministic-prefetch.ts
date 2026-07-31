@@ -1,6 +1,7 @@
 import { buildToolRegistryForTurn } from "@/lib/chat/agent/tool-registry";
 import { executeChatTool } from "@/lib/chat/agent/tools/execute";
 import type { AgentTurnContext, ChatToolName } from "@/lib/chat/agent/types";
+import type { ChatModeId } from "@/lib/chat/modes";
 
 export interface DeterministicPrefetchResult {
   toolsUsed: ChatToolName[];
@@ -14,9 +15,10 @@ export interface DeterministicPrefetchResult {
  */
 export async function runDeterministicPrefetch(
   ctx: AgentTurnContext,
-  onToolStart?: (toolName: ChatToolName) => void
+  onToolStart?: (toolName: ChatToolName) => void,
+  mode?: ChatModeId
 ): Promise<DeterministicPrefetchResult> {
-  const tools = buildToolRegistryForTurn(ctx);
+  const tools = buildToolRegistryForTurn(ctx, mode);
   const toolsUsed: ChatToolName[] = [];
   let failed = false;
 

@@ -7,6 +7,7 @@ import { ZarazPageView } from "@/components/zaraz-page-view";
 import { ChatCalendarBootstrap } from "@/components/chat-calendar-bootstrap";
 import { PageSeoBlock } from "@/components/page-seo-block";
 import { TurnstileSiteKeyProvider } from "@/hooks/use-turnstile-site-key";
+import { TooltipProvider } from "@/components/ui/tooltip";
 import "./globals.css";
 import { GeistSans } from "geist/font/sans";
 import { GeistMono } from "geist/font/mono";
@@ -188,16 +189,18 @@ export default function RootLayout({
           disableTransitionOnChange={true}
         >
           <ThemeShortcut />
-          <TurnstileSiteKeyProvider initialSiteKey={getTurnstileSiteKey()}>
-            <PageSeoBlock
-              heading={CHAT_SEO_TITLE}
-              description={CHAT_SEO_DESCRIPTION}
-              url={SITE_ORIGIN}
-              breadcrumbs={[{ name: "Chat", item: SITE_ORIGIN }]}
-            />
-            <ChatCalendarBootstrap />
-            {children}
-          </TurnstileSiteKeyProvider>
+          <TooltipProvider delay={300}>
+            <TurnstileSiteKeyProvider initialSiteKey={getTurnstileSiteKey()}>
+              <PageSeoBlock
+                heading={CHAT_SEO_TITLE}
+                description={CHAT_SEO_DESCRIPTION}
+                url={SITE_ORIGIN}
+                breadcrumbs={[{ name: "Chat", item: SITE_ORIGIN }]}
+              />
+              <ChatCalendarBootstrap />
+              {children}
+            </TurnstileSiteKeyProvider>
+          </TooltipProvider>
         </ThemeProvider>
         <Suspense fallback={null}>
           <ZarazPageView />

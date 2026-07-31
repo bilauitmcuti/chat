@@ -10,6 +10,8 @@ export const CHAT_TOOL_NAMES = [
   "get_upcoming_events",
   "get_session_timeline",
   "get_lecture_weeks",
+  "get_today_status",
+  "get_public_holiday_meta",
   "get_public_holidays",
   "search_uitm_knowledge",
 ] as const;
@@ -28,6 +30,11 @@ export interface WorkersAiToolSchema {
 
 export interface AgentTurnContext {
   message: string;
+  /**
+   * Query text for tools/prefetch/intent (may include prior user turn for follow-ups).
+   * Defaults to `message` when unset.
+   */
+  effectiveQuery?: string;
   todayISO: string;
   todayFormatted: string;
   program: string;

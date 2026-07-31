@@ -1,4 +1,4 @@
-import { stripInternalContextLeakage } from "@/lib/chat/sanitize";
+import { stripInternalContextLeakage, promoteListSectionTitles } from "@/lib/chat/sanitize";
 
 /**
  * Unwrap server-side [TABLE]...[/TABLE] blocks into plain GFM pipe tables.
@@ -6,8 +6,12 @@ import { stripInternalContextLeakage } from "@/lib/chat/sanitize";
  */
 export function contentToMarkdown(content: string): string {
   return stripInternalContextLeakage(
-    content
-      .replace(/\[TABLE\]([\s\S]*?)\[\/TABLE\]/gi, (_, body) => String(body).trim())
-      .replace(/\[\/?TABLE\]/gi, "")
+    promoteListSectionTitles(
+      content
+        .replace(/\[TABLE\]([\s\S]*?)\[\/TABLE\]/gi, (_, body) => String(body).trim())
+        .replace(/\[\/?TABLE\]/gi, "")
+    )
   );
 }
+
+export { promoteListSectionTitles };

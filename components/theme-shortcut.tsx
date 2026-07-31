@@ -9,7 +9,7 @@ interface NavigatorWithUserAgentData extends Navigator {
   };
 }
 
-function isDesktopWindowsOrMac(): boolean {
+export function isDesktopWindowsOrMac(): boolean {
   if (typeof window === 'undefined') return false;
 
   const navigatorWithUserAgentData = navigator as NavigatorWithUserAgentData;

@@ -56,6 +56,18 @@ The exam week is 21-09-2026 to 25-09-2026.`;
     expect(out).toContain("## Cadangan");
   });
 
+  it("promotes list section titles mistaken as bullets", () => {
+    const raw = `- Sokongan Persekitaran Multi-repo:
+- Cursor boleh dimulakan dalam persekitaran multi-repo.
+- #Aliran Kerja Antara Saluran:
+- Cursor boleh membaca mesej Slack.`;
+    const out = cleanAiReply(raw);
+    expect(out).toContain("## Sokongan Persekitaran Multi-repo");
+    expect(out).toContain("## Aliran Kerja Antara Saluran");
+    expect(out).not.toMatch(/^- Sokongan/m);
+    expect(out).toContain("- Cursor boleh dimulakan");
+  });
+
   it("strips planning lines with mode labels", () => {
     const raw = `OPINION: general study tips
 Ini cadangan umum untuk pelajar UiTM.`;

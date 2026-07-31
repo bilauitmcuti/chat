@@ -8,16 +8,33 @@ import {
 import { isCalendarQuestion } from "@/lib/chat/intent";
 
 describe("suggestion pools", () => {
-  it("Group A has 29 questions", () => {
-    expect(SUGGESTIONS_GROUP_A).toHaveLength(29);
+  it("Group A has 18 questions", () => {
+    expect(SUGGESTIONS_GROUP_A).toHaveLength(18);
   });
 
-  it("Group B has 29 questions", () => {
-    expect(SUGGESTIONS_GROUP_B).toHaveLength(29);
+  it("Group B has 18 questions", () => {
+    expect(SUGGESTIONS_GROUP_B).toHaveLength(18);
   });
 
-  it("has general UiTM questions", () => {
-    expect(SUGGESTIONS_GENERAL.length).toBeGreaterThan(0);
+  it("Group A/B avoid festival-specific cuti chips", () => {
+    const festival = /aidil|fitri|raya|krismas|christmas|tahun baharu|perayaan|cuti khas/i;
+    for (const q of [...SUGGESTIONS_GROUP_A, ...SUGGESTIONS_GROUP_B]) {
+      expect(q, q).not.toMatch(festival);
+    }
+  });
+
+  it("has general UiTM questions covering new tools and modes", () => {
+    expect(SUGGESTIONS_GENERAL.length).toBeGreaterThanOrEqual(9);
+    expect(
+      SUGGESTIONS_GENERAL.some((q) => /minggu kuliah|week/i.test(q))
+    ).toBe(true);
+    expect(SUGGESTIONS_GENERAL.some((q) => /cuti umum/i.test(q))).toBe(true);
+    expect(SUGGESTIONS_GENERAL.some((q) => /rancang|pelan/i.test(q))).toBe(
+      true
+    );
+    expect(SUGGESTIONS_GENERAL.some((q) => /maksud|terangkan/i.test(q))).toBe(
+      true
+    );
   });
 
   it("every Group A suggestion routes to the calendar prompt", () => {

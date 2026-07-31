@@ -1,5 +1,9 @@
-import { fetchPublicHolidays } from "@/lib/calendar-api-server";
-import type { PublicHolidayRow, PublicHolidaysResponse } from "@/lib/calendar-api";
+import { fetchPublicHolidayMeta, fetchPublicHolidays } from "@/lib/calendar-api-server";
+import type {
+  PublicHolidayMetaResponse,
+  PublicHolidayRow,
+  PublicHolidaysResponse,
+} from "@/lib/calendar-api";
 import { normalizeDateString, toComparableDateValue, toDateFormat } from "@/lib/chat/dates";
 import {
   getSessionActivityDateRange,
@@ -208,10 +212,25 @@ export function parseDateRangeFromMessage(
   return { start, end };
 }
 
-export function resolveStateSlugsFromMessage(message: string): string[] {
+export function resolveStateSlugsFromMessage(
+  message: string,
+  meta?: PublicHolidayMetaResponse | null
+): string[] {
   const found: string[] = [];
   for (const { slug, patterns } of STATE_ALIASES) {
     if (patterns.test(message)) found.push(slug);
+  }
+  if (meta?.stateOptions.length) {
+    const allowed = new Set(meta.stateOptions.map((s) => s.value));
+    const fromMetaLabels: string[] = [];
+    const lower = message.toLowerCase();
+    for (const opt of meta.stateOptions) {
+      if (allowed.has(opt.value) && lower.includes(opt.label.toLowerCase())) {
+        fromMetaLabels.push(opt.value);
+      }
+    }
+    const merged = [...new Set([...found, ...fromMetaLabels])].filter((s) => allowed.has(s));
+    return merged.length > 0 ? merged : found.filter((s) => allowed.has(s));
   }
   return found;
 }
@@ -255,43 +274,75 @@ function extractExplicitYearsFromMessage(message: string): number[] {
 export function resolvePublicHolidayYears(
   message: string,
   todayISO: string,
-  sessionIds?: SessionId[]
+  sessionIds?: SessionId[],
+  meta?: PublicHolidayMetaResponse | null
 ): number[] {
   const years = new Set<number>();
   const todayYear = parseInt(todayISO.slice(0, 4), 10);
+  const allowedYears =
+    meta?.yearOptions.length && meta.yearOptions.length > 0
+      ? new Set(meta.yearOptions.map((y) => y.value))
+      : null;
 
-  for (const y of extractExplicitYearsFromMessage(message)) years.add(y);
+  const isAllowed = (y: number) =>
+    y >= MIN_PUBLIC_HOLIDAY_YEAR &&
+    y <= MAX_PUBLIC_HOLIDAY_YEAR &&
+    (allowedYears == null || allowedYears.has(y));
+
+  for (const y of extractExplicitYearsFromMessage(message)) {
+    if (isAllowed(y)) years.add(y);
+  }
 
   if (sessionIds?.length) {
     for (const sid of sessionIds) addYearsFromSessionSpan(sid, years);
   }
 
   const provisionalDefault =
-    years.size > 0 ? Math.min(...years) : todayYear;
+    years.size > 0
+      ? Math.min(...years)
+      : allowedYears?.has(meta?.defaultYear ?? todayYear)
+        ? (meta?.defaultYear ?? todayYear)
+        : todayYear;
   const intent = resolvePublicHolidayQueryIntent(
     message,
     todayISO,
-    provisionalDefault
+    provisionalDefault,
+    meta
   );
 
-  if (intent.singleDate) years.add(parseInt(intent.singleDate.slice(0, 4), 10));
-  if (intent.rangeStartISO) years.add(parseInt(intent.rangeStartISO.slice(0, 4), 10));
-  if (intent.rangeEndISO) years.add(parseInt(intent.rangeEndISO.slice(0, 4), 10));
-
-  if (years.size === 0) {
-    years.add(todayYear);
-    if (intent.wantsNextOnly) years.add(todayYear + 1);
-  } else if (intent.wantsNextOnly) {
-    const maxYear = Math.max(...years);
-    if (maxYear === todayYear) years.add(todayYear + 1);
+  if (intent.singleDate) {
+    const y = parseInt(intent.singleDate.slice(0, 4), 10);
+    if (isAllowed(y)) years.add(y);
+  }
+  if (intent.rangeStartISO) {
+    const y = parseInt(intent.rangeStartISO.slice(0, 4), 10);
+    if (isAllowed(y)) years.add(y);
+  }
+  if (intent.rangeEndISO) {
+    const y = parseInt(intent.rangeEndISO.slice(0, 4), 10);
+    if (isAllowed(y)) years.add(y);
   }
 
-  const sorted = [...years]
-    .filter((y) => y >= MIN_PUBLIC_HOLIDAY_YEAR && y <= MAX_PUBLIC_HOLIDAY_YEAR)
-    .sort((a, b) => a - b);
+  if (years.size === 0) {
+    if (isAllowed(todayYear)) years.add(todayYear);
+    else if (meta?.defaultYear != null && isAllowed(meta.defaultYear)) {
+      years.add(meta.defaultYear);
+    }
+    if (intent.wantsNextOnly && isAllowed(todayYear + 1)) years.add(todayYear + 1);
+  } else if (intent.wantsNextOnly) {
+    const maxYear = Math.max(...years);
+    if (maxYear === todayYear && isAllowed(todayYear + 1)) years.add(todayYear + 1);
+  }
+
+  // Drop years not in meta allowlist when present
+  for (const y of [...years]) {
+    if (!isAllowed(y)) years.delete(y);
+  }
+
+  const sorted = [...years].sort((a, b) => a - b);
 
   if (sorted.length <= MAX_PUBLIC_HOLIDAY_YEARS_FETCH) return sorted;
-  const explicit = extractExplicitYearsFromMessage(message);
+  const explicit = extractExplicitYearsFromMessage(message).filter(isAllowed);
   if (explicit.length > 0) {
     return explicit.slice(0, MAX_PUBLIC_HOLIDAY_YEARS_FETCH).sort((a, b) => a - b);
   }
@@ -317,10 +368,11 @@ export function resolvePrimaryPublicHolidayYear(
 export function resolvePublicHolidayQueryIntent(
   message: string,
   todayISO: string,
-  defaultYear: number
+  defaultYear: number,
+  meta?: PublicHolidayMetaResponse | null
 ): PublicHolidayQueryIntent {
   const lower = message.toLowerCase();
-  const stateSlugs = resolveStateSlugsFromMessage(message);
+  const stateSlugs = resolveStateSlugsFromMessage(message, meta);
   const stateSlug = stateSlugs.length === 1 ? stateSlugs[0]! : null;
   const singleDate = parseDateFromMessage(message, defaultYear);
   const { start, end } = parseDateRangeFromMessage(message, todayISO, defaultYear);
@@ -357,27 +409,36 @@ export function needsPublicHolidayContext(message: string): boolean {
   return false;
 }
 
-export function resolveStateSlugFromMessage(message: string): string | null {
-  const slugs = resolveStateSlugsFromMessage(message);
+export function resolveStateSlugFromMessage(
+  message: string,
+  meta?: PublicHolidayMetaResponse | null
+): string | null {
+  const slugs = resolveStateSlugsFromMessage(message, meta);
   return slugs.length === 1 ? slugs[0]! : null;
 }
 
-function formatStateScopeLabels(stateSlugs: string[]): string {
-  return stateSlugs.map(stateLabelFromSlug).join(", ");
+function formatStateScopeLabels(
+  stateSlugs: string[],
+  meta?: PublicHolidayMetaResponse | null
+): string {
+  return stateSlugs.map((s) => stateLabelFromSlug(s, meta)).join(", ");
 }
 
-function publicHolidayStateScopeNote(stateSlugs: string[]): string {
+function publicHolidayStateScopeNote(
+  stateSlugs: string[],
+  meta?: PublicHolidayMetaResponse | null
+): string {
   if (stateSlugs.length === 0) {
     return "- State: Malaysia — all states and federal territories in the dataset (nationwide + state/regional rows below).";
   }
   if (stateSlugs.length === 1) {
-    const label = stateLabelFromSlug(stateSlugs[0]!);
+    const label = stateLabelFromSlug(stateSlugs[0]!, meta);
     const kkt = UITM_KKT_STATE_SLUGS.has(stateSlugs[0]!);
     return kkt
       ? `- State: ${label} only. Public holiday list for ${label} (rows below). UiTM KKT dual-date layout is for semester calendar only—not for this cuti umum list.`
       : `- State: ${label} only. List holidays observed in ${label} from rows below. Do not use Kedah/Kelantan/Terengganu (KKT) headings—those are for UiTM academic calendar, not ${label} public holidays.`;
   }
-  return `- States: ${formatStateScopeLabels(stateSlugs)}. Include each row below that applies to any of these states. Do not merge into a KKT heading unless the user asked for UiTM semester calendar.`;
+  return `- States: ${formatStateScopeLabels(stateSlugs, meta)}. Include each row below that applies to any of these states. Do not merge into a KKT heading unless the user asked for UiTM semester calendar.`;
 }
 
 /** Best-effort ISO date (YYYY-MM-DD) from user text; uses defaultYear when year omitted. */
@@ -407,13 +468,18 @@ export function parseDateFromMessage(message: string, defaultYear: number): stri
   return null;
 }
 
-export function stateLabelFromSlug(slug: string): string {
+export function stateLabelFromSlug(
+  slug: string,
+  meta?: PublicHolidayMetaResponse | null
+): string {
+  const fromMeta = meta?.stateOptions.find((s) => s.value === slug)?.label;
+  if (fromMeta) return fromMeta;
   return STATE_LABEL_BY_SLUG[slug] ?? slug.replace(/-/g, " ");
 }
 
 function formatStateLabelsForLine(states: string[]): string {
   return [...states]
-    .map(stateLabelFromSlug)
+    .map((slug) => stateLabelFromSlug(slug))
     .sort((a, b) => a.localeCompare(b))
     .join(", ");
 }
@@ -474,10 +540,14 @@ function filterHolidaysForTurn(
   return rows;
 }
 
-function formatIntentSummary(intent: PublicHolidayQueryIntent, year: number): string[] {
+function formatIntentSummary(
+  intent: PublicHolidayQueryIntent,
+  year: number,
+  meta?: PublicHolidayMetaResponse | null
+): string[] {
   const lines: string[] = [
     "USER QUESTION INTERPRETATION (apply every word—public holidays only, not UiTM semester calendar):",
-    publicHolidayStateScopeNote(intent.stateSlugs),
+    publicHolidayStateScopeNote(intent.stateSlugs, meta),
   ];
 
   if (intent.singleDate && !intent.rangeStartISO) {
@@ -552,9 +622,10 @@ export function getPublicHolidayUnderstandingDirective(
 export function formatPublicHolidayBlock(
   data: PublicHolidaysResponse,
   message: string,
-  todayISO: string
+  todayISO: string,
+  meta?: PublicHolidayMetaResponse | null
 ): string {
-  const intent = resolvePublicHolidayQueryIntent(message, todayISO, data.year);
+  const intent = resolvePublicHolidayQueryIntent(message, todayISO, data.year, meta);
   const rows = filterHolidaysForTurn(data, intent, todayISO);
   const lineStateFilter = intent.stateSlug;
 
@@ -567,7 +638,7 @@ export function formatPublicHolidayBlock(
   return [
     `=== MALAYSIA PUBLIC HOLIDAYS (${data.year}) ===`,
     PUBLIC_HOLIDAY_REPLY_STYLE,
-    ...formatIntentSummary(intent, data.year),
+    ...formatIntentSummary(intent, data.year, meta),
     "Official public holiday data. Holiday rows below are oldest → newest (internal context only).",
     "For whether UiTM is off on a date: check GROUP calendar break/cuti rows for the selected session AND this block.",
     `Rows in this turn: ${rows.length} (API year total: ${data.total}).`,
@@ -576,6 +647,30 @@ export function formatPublicHolidayBlock(
   ]
     .filter(Boolean)
     .join("\n");
+}
+
+export function formatPublicHolidayMetaBlock(meta: PublicHolidayMetaResponse): string {
+  const years = meta.yearOptions
+    .slice(0, 12)
+    .map((y) => `- ${y.value}: ${y.label}`)
+    .join("\n");
+  const coverage = meta.coverageOptions
+    .map((c) => `- ${c.value}: ${c.label}`)
+    .join("\n");
+  const states = meta.stateOptions
+    .map((s) => `- ${s.value}: ${s.label}`)
+    .join("\n");
+  return [
+    "=== PUBLIC HOLIDAY META (filter options) ===",
+    `Default year: ${meta.defaultYear}`,
+    "Year options:",
+    years || "(none)",
+    "Coverage options:",
+    coverage || "(none)",
+    "State slugs (use these exact values with get_public_holidays):",
+    states || "(none)",
+    "Do not invent state slugs or years outside this list.",
+  ].join("\n");
 }
 
 export interface PublicHolidayChatContext {
@@ -597,14 +692,33 @@ export async function buildPublicHolidayChatContext(
     directive: "",
   };
   try {
-    const years = resolvePublicHolidayYears(message, todayISO, options?.sessionIds);
+    const meta = await fetchPublicHolidayMeta().catch(() => null);
+    const years = resolvePublicHolidayYears(
+      message,
+      todayISO,
+      options?.sessionIds,
+      meta
+    );
+    if (years.length === 0) return empty;
     const primaryYear = resolvePrimaryPublicHolidayYear(years, message, todayISO);
+    const intent = resolvePublicHolidayQueryIntent(
+      message,
+      todayISO,
+      primaryYear,
+      meta
+    );
+    const singleState = intent.stateSlugs.length === 1 ? intent.stateSlugs[0]! : null;
+
     const datasets = await Promise.all(
-      years.map((year) => fetchPublicHolidays({ coverage: "all", year }))
+      years.map((year) =>
+        singleState
+          ? fetchPublicHolidays({ year, state: singleState })
+          : fetchPublicHolidays({ coverage: "all", year })
+      )
     );
     const blocks = datasets
       .filter((data) => data.holidays.length > 0)
-      .map((data) => formatPublicHolidayBlock(data, message, todayISO));
+      .map((data) => formatPublicHolidayBlock(data, message, todayISO, meta));
     if (blocks.length === 0) return empty;
     return {
       block: blocks.join("\n\n"),

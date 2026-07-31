@@ -88,5 +88,8 @@ export function parseChatRequest(
     model = modelId;
   }
 
-  return { success: true, data: { message, program, selectedSessions, history, turnstileToken, model, stream } };
+  return {
+    success: true,
+    data: { message, program, selectedSessions, history, turnstileToken, model, stream },
+  };
 }

@@ -15,6 +15,7 @@ import {
 import { getDefaultSessionForGroup, getActivitiesForSession } from "@/lib/data";
 import type { AgentTurnContext } from "@/lib/chat/agent/types";
 import type { CalendarContextIntent } from "@/lib/chat/calendar-intent";
+import { getModeSystemDirective, type ChatModeId } from "@/lib/chat/modes";
 
 export interface CompactFallbackParams {
   ctx: AgentTurnContext;
@@ -28,6 +29,7 @@ export interface CompactFallbackParams {
   multipleSessionsSelected: boolean;
   contextIntent: CalendarContextIntent;
   useIntentFilter: boolean;
+  mode?: ChatModeId;
 }
 
 /**
@@ -45,7 +47,7 @@ export async function buildCompactFallbackSystemPrompt(
     );
 
   const { dataContext, publicHolidayDirective } = await buildDataContextForTurn({
-    message: ctx.message,
+    message: ctx.effectiveQuery ?? ctx.message,
     todayISO: ctx.todayISO,
     route: ctx.topicRoute,
     contextSessionIds: ctx.contextSessionIds,
@@ -69,11 +71,14 @@ export async function buildCompactFallbackSystemPrompt(
     dataContextFull = matched + (dataContextFull ? `\n\n${dataContextFull}` : "");
   }
 
+  const modeDirective = getModeSystemDirective(params.mode ?? "ask");
+
   if (useResearchOnly) {
     return (
       buildResearchSystemPrompt(ctx.todayFormatted) +
       (dataContextFull ? `\n\n${dataContextFull}` : "") +
-      publicHolidayDirective
+      publicHolidayDirective +
+      modeDirective
     );
   }
 
@@ -116,6 +121,8 @@ export async function buildCompactFallbackSystemPrompt(
       uitmSupplement: params.includeUitmSupplement ? params.uitmSupplement : "",
       includeSecondaryContext: params.includeSecondary,
       maxPrimaryChars: MAX_PRIMARY_CONTEXT_CHARS_COMPACT,
-    }) + publicHolidayDirective
+    }) +
+    publicHolidayDirective +
+    modeDirective
   );
 }

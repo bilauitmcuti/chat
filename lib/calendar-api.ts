@@ -383,6 +383,57 @@ export interface PublicHolidaysResponse {
   holidays: PublicHolidayRow[];
 }
 
+export interface PublicHolidayYearOption {
+  value: number;
+  label: string;
+}
+
+export interface PublicHolidayCoverageOption {
+  value: "all" | "nationwide";
+  label: string;
+}
+
+export interface PublicHolidayStateOption {
+  value: string;
+  label: string;
+}
+
+export interface PublicHolidayMetaResponse {
+  defaultYear: number;
+  yearOptions: PublicHolidayYearOption[];
+  coverageOptions: PublicHolidayCoverageOption[];
+  stateOptions: PublicHolidayStateOption[];
+}
+
+export interface TodayMatchedActivity {
+  name: string;
+  startDate: string;
+  endDate?: string;
+  type: string;
+  group?: string;
+}
+
+export interface TodayResponse {
+  date: string;
+  primaryStatus: string;
+  statuses: string[];
+  sessionResolved?: { id: string; label: string; group: string };
+  matchedActivities: TodayMatchedActivity[];
+}
+
+export type FetchPublicHolidaysOptions = {
+  year?: number;
+  state?: string;
+  coverage?: "all" | "nationwide";
+};
+
+export type FetchTodayStatusParams = {
+  group: "A" | "B";
+  date?: string;
+  session?: string;
+  program?: string;
+};
+
 const publicHolidaysInflight = new Map<string, Promise<PublicHolidaysResponse>>();
 const publicHolidaysCache = new Map<string, { data: PublicHolidaysResponse; at: number }>();
 const PUBLIC_HOLIDAYS_TTL_MS = 5 * 60 * 1000;
@@ -417,15 +468,29 @@ export function parsePublicHolidaysResponse(data: unknown): PublicHolidaysRespon
   return { defaultYear, year, total, holidays };
 }
 
+export function buildPublicHolidaySearchParams(
+  options?: FetchPublicHolidaysOptions
+): URLSearchParams {
+  const q = new URLSearchParams();
+  if (options?.year != null) q.set("year", String(options.year));
+  if (options?.state) {
+    q.set("state", options.state);
+  } else if (options?.coverage) {
+    q.set("coverage", options.coverage);
+  } else {
+    q.set("coverage", "all");
+  }
+  return q;
+}
+
 /**
  * Malaysia public holidays (nationwide + state/regional).
- * GET /api/v1/public-holiday?coverage=all
+ * Prefer `?year=&state=` when filtering by state; `coverage=all` ignores state.
  */
 export async function fetchPublicHolidays(
-  options?: { coverage?: "all"; year?: number }
+  options?: FetchPublicHolidaysOptions
 ): Promise<PublicHolidaysResponse> {
-  const q = new URLSearchParams({ coverage: options?.coverage ?? "all" });
-  if (options?.year != null) q.set("year", String(options.year));
+  const q = buildPublicHolidaySearchParams(options);
   const cacheKey = q.toString();
   const url = buildCalendarRequestUrl("v1/public-holiday", q);
 
@@ -449,4 +514,86 @@ export async function fetchPublicHolidays(
 
   publicHolidaysInflight.set(cacheKey, promise);
   return promise;
+}
+
+export function parsePublicHolidayMetaResponse(data: unknown): PublicHolidayMetaResponse {
+  const fallbackYear = new Date().getFullYear();
+  if (!data || typeof data !== "object") {
+    return {
+      defaultYear: fallbackYear,
+      yearOptions: [],
+      coverageOptions: [],
+      stateOptions: [],
+    };
+  }
+  const o = data as Record<string, unknown>;
+  const defaultYear =
+    typeof o.defaultYear === "number" ? o.defaultYear : fallbackYear;
+  const yearOptions: PublicHolidayYearOption[] = Array.isArray(o.yearOptions)
+    ? o.yearOptions
+        .map((row) => {
+          const r = (row && typeof row === "object" ? row : {}) as Record<string, unknown>;
+          const value = typeof r.value === "number" ? r.value : Number(r.value);
+          if (!Number.isFinite(value)) return null;
+          return { value, label: String(r.label ?? value) };
+        })
+        .filter((x): x is PublicHolidayYearOption => x != null)
+    : [];
+  const coverageOptions: PublicHolidayCoverageOption[] = Array.isArray(o.coverageOptions)
+    ? o.coverageOptions
+        .map((row) => {
+          const r = (row && typeof row === "object" ? row : {}) as Record<string, unknown>;
+          const value = String(r.value ?? "");
+          if (value !== "all" && value !== "nationwide") return null;
+          return { value, label: String(r.label ?? value) };
+        })
+        .filter((x): x is PublicHolidayCoverageOption => x != null)
+    : [];
+  const stateOptions: PublicHolidayStateOption[] = Array.isArray(o.stateOptions)
+    ? o.stateOptions
+        .map((row) => {
+          const r = (row && typeof row === "object" ? row : {}) as Record<string, unknown>;
+          const value = String(r.value ?? "").trim();
+          if (!value) return null;
+          return { value, label: String(r.label ?? value) };
+        })
+        .filter((x): x is PublicHolidayStateOption => x != null)
+    : [];
+  return { defaultYear, yearOptions, coverageOptions, stateOptions };
+}
+
+export function parseTodayResponse(data: unknown): TodayResponse {
+  if (!data || typeof data !== "object") {
+    return { date: "", primaryStatus: "unknown", statuses: [], matchedActivities: [] };
+  }
+  const o = data as Record<string, unknown>;
+  const sessionRaw =
+    o.sessionResolved && typeof o.sessionResolved === "object"
+      ? (o.sessionResolved as Record<string, unknown>)
+      : null;
+  const matchedActivities: TodayMatchedActivity[] = Array.isArray(o.matchedActivities)
+    ? o.matchedActivities.map((row) => {
+        const a = (row && typeof row === "object" ? row : {}) as Record<string, unknown>;
+        return {
+          name: String(a.name ?? ""),
+          startDate: String(a.startDate ?? ""),
+          endDate: a.endDate != null ? String(a.endDate) : undefined,
+          type: String(a.type ?? "other"),
+          group: a.group != null ? String(a.group) : undefined,
+        };
+      })
+    : [];
+  return {
+    date: String(o.date ?? ""),
+    primaryStatus: String(o.primaryStatus ?? "unknown"),
+    statuses: Array.isArray(o.statuses) ? o.statuses.map(String) : [],
+    sessionResolved: sessionRaw
+      ? {
+          id: String(sessionRaw.id ?? ""),
+          label: String(sessionRaw.label ?? ""),
+          group: String(sessionRaw.group ?? ""),
+        }
+      : undefined,
+    matchedActivities,
+  };
 }

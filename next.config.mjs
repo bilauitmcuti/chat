@@ -1,9 +1,43 @@
+import fs from "fs";
 import path from "path";
 import { initOpenNextCloudflareForDev } from "@opennextjs/cloudflare";
 import {
   NEXT_CONFIG_EXTRA_HEADER_ENTRIES,
   SECURITY_HEADER_ENTRIES,
 } from "./lib/security-headers.mjs";
+
+/**
+ * One stable id for client bundle + /api/version across multi-pass Next/OpenNext builds.
+ * Prefer CI SHA; otherwise persist once to `.next-build-id` for this build.
+ */
+function resolvePublicBuildId() {
+  const fromEnv =
+    process.env.NEXT_PUBLIC_BUILD_ID?.trim() ||
+    process.env.GITHUB_SHA?.trim() ||
+    process.env.CF_PAGES_COMMIT_SHA?.trim() ||
+    "";
+  if (fromEnv) return fromEnv;
+
+  const filePath = path.join(process.cwd(), ".next-build-id");
+  try {
+    if (fs.existsSync(filePath)) {
+      const existing = fs.readFileSync(filePath, "utf8").trim();
+      if (existing) return existing;
+    }
+  } catch {
+    // fall through to write
+  }
+
+  const generated = `${Date.now()}`;
+  try {
+    fs.writeFileSync(filePath, generated, "utf8");
+  } catch {
+    // still return generated so this process stays consistent
+  }
+  return generated;
+}
+
+const PUBLIC_BUILD_ID = resolvePublicBuildId();
 
 /** @type {import('next').NextConfig} */
 const nextConfig = {
@@ -16,7 +50,7 @@ const nextConfig = {
     ],
   },
   env: {
-    NEXT_PUBLIC_BUILD_ID: Date.now().toString(),
+    NEXT_PUBLIC_BUILD_ID: PUBLIC_BUILD_ID,
     NEXT_PUBLIC_TURNSTILE_SITE_KEY:
       process.env.NEXT_PUBLIC_TURNSTILE_SITE_KEY?.trim() ||
       process.env.TURNSTILE_SITE_KEY?.trim() ||

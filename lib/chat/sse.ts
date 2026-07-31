@@ -58,6 +58,29 @@ export interface ChatStreamResetPayload {
   message?: string;
 }
 
+/** A chunk ending in a bare list / heading / quote / table marker. */
+const DANGLING_MARKER_TAIL = /(?:^|\n)[ \t]*(?:[-*+]|\d+[.)]|#{1,6}|>|\|)[ \t]*$/;
+
+/** The marker itself, including trailing spaces. */
+const MARKER_PREFIX = /^[ \t]*(?:[-*+]|\d+[.)]|#{1,6}|>|\|)[ \t]*/;
+
+/**
+ * Adjust a flush boundary so a chunk never ends with a marker alone ("- ",
+ * "1. ", "## "). Extends the cut when the marker's text is already buffered,
+ * otherwise cuts before the marker so it waits for its text.
+ */
+function resolveSafeFlushCut(buf: string, cut: number): number {
+  const match = DANGLING_MARKER_TAIL.exec(buf.slice(0, cut));
+  if (!match) return cut;
+
+  const markerStart = match[0].startsWith("\n") ? match.index + 1 : match.index;
+  const rest = buf.slice(markerStart);
+  const prefix = MARKER_PREFIX.exec(rest)?.[0] ?? "";
+  const word = /^\S+/.exec(rest.slice(prefix.length))?.[0];
+  if (!word) return markerStart;
+  return markerStart + prefix.length + word.length;
+}
+
 /**
  * Buffers raw model tokens into sentence/paragraph-sized chunks so mid-stream
  * markdown paints less broken while preserving an early first paint.
@@ -75,23 +98,12 @@ export function createMarkdownStreamPainter(
   let buf = "";
   let hasFlushed = false;
 
-  function takeFlushablePrefix(): string | null {
-    if (!buf) return null;
-
+  function nextFlushCut(): number | null {
     const paraIdx = buf.indexOf("\n\n");
-    if (paraIdx >= 0) {
-      const end = paraIdx + 2;
-      const chunk = buf.slice(0, end);
-      buf = buf.slice(end);
-      return chunk;
-    }
+    if (paraIdx >= 0) return paraIdx + 2;
 
     const sentenceMatch = buf.match(/^[\s\S]{4,}?[.!?…](?:\s+|$)/);
-    if (sentenceMatch?.[0]) {
-      const chunk = sentenceMatch[0];
-      buf = buf.slice(chunk.length);
-      return chunk;
-    }
+    if (sentenceMatch?.[0]) return sentenceMatch[0].length;
 
     if (!hasFlushed && buf.length >= firstFlushChars) {
       const window = buf.slice(0, firstFlushChars);
@@ -100,10 +112,7 @@ export function createMarkdownStreamPainter(
         window.lastIndexOf(" "),
         window.lastIndexOf("|")
       );
-      const cut = breakAt >= 4 ? breakAt + 1 : firstFlushChars;
-      const chunk = buf.slice(0, cut);
-      buf = buf.slice(cut);
-      return chunk;
+      return breakAt >= 4 ? breakAt + 1 : firstFlushChars;
     }
 
     if (buf.length >= maxChunkChars) {
@@ -113,13 +122,24 @@ export function createMarkdownStreamPainter(
         window.lastIndexOf(" "),
         window.lastIndexOf("|")
       );
-      const cut = breakAt >= 12 ? breakAt + 1 : maxChunkChars;
-      const chunk = buf.slice(0, cut);
-      buf = buf.slice(cut);
-      return chunk;
+      return breakAt >= 12 ? breakAt + 1 : maxChunkChars;
     }
 
     return null;
+  }
+
+  function takeFlushablePrefix(): string | null {
+    if (!buf) return null;
+
+    const cut = nextFlushCut();
+    if (cut == null) return null;
+
+    const safeCut = resolveSafeFlushCut(buf, cut);
+    if (safeCut <= 0) return null;
+
+    const chunk = buf.slice(0, safeCut);
+    buf = buf.slice(safeCut);
+    return chunk;
   }
 
   return {

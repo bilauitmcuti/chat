@@ -11,6 +11,7 @@ import { buildAgentSystemPrompt } from "@/lib/chat/agent/system-prompt";
 import { buildEmbeddedChatTools } from "@/lib/chat/agent/embedded-tools";
 import type { AgentRunResult, AgentTurnContext, ChatToolName } from "@/lib/chat/agent/types";
 import { MAX_AGENT_TOOL_STEPS } from "@/lib/chat/agent/types";
+import { DEFAULT_CHAT_MODE, type ChatModeId } from "@/lib/chat/modes";
 
 /** Global kill-switch only — FC models use agent path when not disabled. */
 export function isChatAgentEnabled(): boolean {
@@ -35,6 +36,7 @@ export interface RunChatAgentOptions {
   history: ChatMessage[] | undefined;
   ctx: AgentTurnContext;
   modelId?: string | null;
+  mode?: ChatModeId;
   correlationId?: string;
   maxTokens: number;
   temperature: number;
@@ -49,9 +51,10 @@ export interface RunChatAgentOptions {
 
 export async function runChatAgent(options: RunChatAgentOptions): Promise<AgentRunResult> {
   const modelId = resolveChatModel(options.modelId);
-  const mode = agentModeForModelId(modelId);
+  const agentMode = agentModeForModelId(modelId);
+  const chatMode = options.mode ?? DEFAULT_CHAT_MODE;
 
-  if (mode === "compact") {
+  if (agentMode === "compact") {
     return {
       reply: "",
       toolsUsed: [],
@@ -59,7 +62,7 @@ export async function runChatAgent(options: RunChatAgentOptions): Promise<AgentR
     };
   }
 
-  let availableTools = buildToolRegistryForTurn(options.ctx);
+  let availableTools = buildToolRegistryForTurn(options.ctx, chatMode);
   let extraDirectives = options.extraSystemDirectives ?? "";
   const toolsUsed: string[] = [];
 
@@ -77,7 +80,8 @@ export async function runChatAgent(options: RunChatAgentOptions): Promise<AgentR
   const systemPrompt = buildAgentSystemPrompt(
     options.ctx,
     availableTools,
-    extraDirectives
+    extraDirectives,
+    chatMode
   );
 
   const embeddedTools = buildEmbeddedChatTools(options.ctx, availableTools);

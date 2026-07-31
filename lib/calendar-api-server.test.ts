@@ -39,4 +39,26 @@ describe("fetchPublicHolidays (server upstream)", () => {
     expect(result.holidays[0]?.name).toBe("Hari Merdeka");
     expect(fetchMock).toHaveBeenCalledTimes(1);
   });
+
+  it("fetches with state+year and omits coverage=all", async () => {
+    const fetchMock = vi.fn(async (url: string) => {
+      expect(url).toContain("/api/v1/public-holiday?");
+      expect(url).toContain("year=2026");
+      expect(url).toContain("state=selangor");
+      expect(url).not.toContain("coverage=");
+      return new Response(
+        JSON.stringify({
+          defaultYear: 2026,
+          holidays: [],
+          query: { year: 2026, state: "selangor" },
+        }),
+        { status: 200, headers: { "Content-Type": "application/json" } }
+      );
+    });
+    vi.stubGlobal("fetch", fetchMock);
+
+    const { fetchPublicHolidays } = await import("@/lib/calendar-api-server");
+    await fetchPublicHolidays({ year: 2026, state: "selangor" });
+    expect(fetchMock).toHaveBeenCalledTimes(1);
+  });
 });

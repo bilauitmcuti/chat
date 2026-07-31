@@ -55,7 +55,7 @@ const TOOL_DEFINITIONS: Record<ChatToolName, WorkersAiToolSchema> = {
   get_lecture_weeks: {
     name: "get_lecture_weeks",
     description:
-      "Get lecture week numbers and date ranges (Week 1..N). Use for minggu kuliah, week berapa, lecture week list, or current week — NOT Kuliah activity rows from the academic calendar. Set full_table=true when user asks for all weeks or a week table.",
+      "Get lecture week numbers and date ranges (Week 1..N). Use for minggu kuliah, week berapa, lecture week list, or current week — NOT Kuliah activity rows from the academic calendar. Set full_table=true when user asks for all weeks or a week table. Optional session must be one of the user's selected sessions.",
     parameters: {
       type: "object",
       properties: {
@@ -63,13 +63,44 @@ const TOOL_DEFINITIONS: Record<ChatToolName, WorkersAiToolSchema> = {
           type: "boolean",
           description: "When true, return all weeks 1..N; when false, current week quick reference only",
         },
+        session: {
+          type: "string",
+          description: "Optional session id from the selected sessions only",
+        },
       },
+    },
+  },
+  get_today_status: {
+    name: "get_today_status",
+    description:
+      "Get official day status for a date (class day, break, exam week, study week) via primaryStatus and matched activities. Use for ada kelas / class today / status hari ini / cuti ke hari ni — NOT for named calendar events (use search_calendar_activities) and NOT for Malaysia public holidays.",
+    parameters: {
+      type: "object",
+      properties: {
+        date: {
+          type: "string",
+          description: "ISO date YYYY-MM-DD; defaults to today (Malaysia)",
+        },
+        session: {
+          type: "string",
+          description: "Optional session id from the selected sessions only",
+        },
+      },
+    },
+  },
+  get_public_holiday_meta: {
+    name: "get_public_holiday_meta",
+    description:
+      "Get Malaysia public holiday filter options: valid years, coverage modes, and state/territory slugs. Call before get_public_holidays when you need valid state slugs or years. Do not invent slugs.",
+    parameters: {
+      type: "object",
+      properties: {},
     },
   },
   get_public_holidays: {
     name: "get_public_holidays",
     description:
-      "Get Malaysia public holidays (cuti umum). Not UiTM semester break unless user asks UiTM schedule.",
+      "Get Malaysia public holidays (cuti umum). Not UiTM semester break unless user asks UiTM schedule. Prefer state/year from get_public_holiday_meta when filtering.",
     parameters: {
       type: "object",
       properties: {

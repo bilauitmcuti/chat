@@ -2,6 +2,7 @@ import { TABLE_OUTPUT_RULE } from "@/lib/chat/intent";
 import type { ChatTopic } from "@/lib/chat/topic-router";
 import {
   CHAT_ANSWER_MODE_POLICY,
+  CHAT_CONTEXT_SUFFICIENCY_POLICY,
   CHAT_GRACEFUL_FALLBACK_POLICY,
   CHAT_RESPONSE_FORMAT_RULES,
 } from "@/lib/chat/response-format";
@@ -81,12 +82,13 @@ export function buildChatAssistantSystemPrompt(params: BuildChatPromptParams): s
     CHATBOT_IDENTITY,
     DATA_POLICY,
     CHAT_ANSWER_MODE_POLICY,
+    CHAT_CONTEXT_SUFFICIENCY_POLICY,
     CHAT_GRACEFUL_FALLBACK_POLICY,
     CHAT_RESPONSE_FORMAT_RULES,
     topicLine,
     `Program: ${programLabel} (GROUP ${primaryGroup}). Default to GROUP ${primaryGroup} unless the user asks about Group ${secondaryGroup}.`,
     `TODAY (Malaysia, UTC+8): ${todayFormatted}`,
-    "CONTEXT AWARENESS: Program and session are pre-selected. Do not ask the user to confirm them again on follow-ups.",
+    "CONTEXT AWARENESS: Programme, session, and group are pre-selected. Do not re-ask them when clear and consistent; ask one clarifying question only if missing, ambiguous, or conflicting per CONTEXT SUFFICIENCY.",
     "",
     "=== DATA CONTEXT (API-backed for this turn) ===",
     dataContext || "(no supplemental blocks)",

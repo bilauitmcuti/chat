@@ -48,17 +48,8 @@ export function ChatEmptyMobile({
     <div className="flex min-h-0 min-w-0 flex-1 flex-col overflow-hidden lg:hidden">
       <div className="flex min-h-0 min-w-0 flex-1 flex-col items-center justify-center overflow-hidden px-4 pb-6">
         <Empty className="mx-auto max-w-[600px] flex-none border-none p-0">
-          <EmptyHeader>
-            <EmptyTitle className="text-2xl sm:text-3xl font-semibold tracking-tight text-balance">
-              Ask AI, get instant answers
-            </EmptyTitle>
-            <EmptyDescription className="max-w-sm text-balance">
-              Ask about academic calendars or public holidays. Select your programme, or type @ to
-              mention a calendar.
-            </EmptyDescription>
-          </EmptyHeader>
           {showTurnstileSlot ? (
-            <div className="mx-auto mt-4 flex min-h-[65px] w-full max-w-[320px] items-start justify-center px-3">
+            <div className="mx-auto mb-4 flex min-h-[65px] w-full max-w-[320px] items-start justify-center px-3">
               {showTurnstileChallenge ? (
                 <TurnstileWidget
                   ref={turnstileRef}
@@ -70,6 +61,15 @@ export function ChatEmptyMobile({
               ) : null}
             </div>
           ) : null}
+          <EmptyHeader>
+            <EmptyTitle className="text-2xl sm:text-3xl font-semibold tracking-tight text-balance">
+              Ask AI, get instant answers
+            </EmptyTitle>
+            <EmptyDescription className="max-w-sm text-balance">
+              Ask about academic calendars or public holidays. Select your programme, or type @ to
+              mention a calendar.
+            </EmptyDescription>
+          </EmptyHeader>
         </Empty>
       </div>
       <div className="chat-input-area relative min-w-0 shrink-0 overflow-x-hidden pt-1 pb-6">

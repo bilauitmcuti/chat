@@ -84,6 +84,10 @@ import {
   usesResearchStylePrompt,
 } from "@/lib/chat/chat-prompt";
 import { routeChatTopics, type ChatTopic } from "@/lib/chat/topic-router";
+import {
+  mergeFollowUpTopics,
+  resolveFollowUpTurn,
+} from "@/lib/chat/follow-up-context";
 import { buildPublicHolidayChatContext } from "@/lib/chat/public-holiday-context";
 import {
   getCalendarUnderstandingDirective,
@@ -124,6 +128,7 @@ import {
   CHAT_TIMEOUT_MESSAGE,
   isEmptyModelReplyError,
 } from "@/lib/chat/user-messages";
+import { getModeSystemDirective, resolveModeFromMessage } from "@/lib/chat/modes";
 
 /** Soft deadline for single_stream turns (under Workers ~30s wall; I/O-bound AI). */
 const CHAT_SERVER_DEADLINE_MS = 28_000;
@@ -138,6 +143,8 @@ const AGENT_CALENDAR_TOOLS = new Set([
   "get_upcoming_events",
   "get_session_timeline",
   "get_lecture_weeks",
+  "get_today_status",
+  "get_public_holiday_meta",
   "get_public_holidays",
 ]);
 
@@ -189,6 +196,10 @@ function isCalendarOnlyTopics(topics: ChatTopic[]): boolean {
   return topics.length > 0 && topics.every((topic) => CALENDAR_ONLY_TOPICS.has(topic));
 }
 
+/**
+ * Prefer one LLM call with deterministic prefetch for typical student questions.
+ * Use the FC agent loop for complex multi-topic turns so the model can choose tools.
+ */
 export function shouldPreferSingleStream(input: {
   hasMatchedActivity: boolean;
   isSimple: boolean;
@@ -196,9 +207,14 @@ export function shouldPreferSingleStream(input: {
   isComplexTurn: boolean;
 }): boolean {
   if (input.hasMatchedActivity || input.isSimple) return true;
-  if (input.topics.includes("uitm_general")) return true;
-  if (isCalendarOnlyTopics(input.topics)) return true;
   if (input.topics.length === 0) return true;
+  // uitm_general alone → prefetch / single stream
+  if (input.topics.length === 1 && input.topics[0] === "uitm_general") return true;
+  // Single calendar topic → prefetch (even if complex)
+  if (isCalendarOnlyTopics(input.topics) && input.topics.length === 1) return true;
+  // Complex or multi-topic → FC agent loop
+  if (input.isComplexTurn || input.topics.length > 1) return false;
+  if (isCalendarOnlyTopics(input.topics)) return true;
   return true;
 }
 
@@ -322,6 +338,7 @@ export async function POST(request: NextRequest) {
     const selectedProgram =
       program && validPrograms.has(program) ? program : "All";
     const sanitizedMessage = sanitizeMessage(message);
+    const chatMode = resolveModeFromMessage(sanitizedMessage);
 
     const programMeta = getProgramOptions().find((p) => p.value === selectedProgram);
     const programLabel = programMeta?.label || selectedProgram;
@@ -383,12 +400,6 @@ export async function POST(request: NextRequest) {
     const activityMatches = matchActivitiesInMessage(sanitizedMessage, flatPool);
     const hasMatchedActivity = activityMatches.length > 0;
 
-    const isMinimalTurn = isMinimalConversationalMessage(sanitizedMessage);
-    const topicRoute = routeChatTopics(sanitizedMessage, hasMatchedActivity, {
-      isMinimalTurn,
-    });
-    const useIntentFilter = shouldUseCalendarIntentFilter(topicRoute, activityMatches.length);
-
     const sanitizedHistory: ChatMessage[] = trimHistoryForModel(
       (history ?? []).map((msg) => ({
         role: msg.role,
@@ -396,6 +407,30 @@ export async function POST(request: NextRequest) {
           msg.role === "user" ? sanitizeMessage(msg.content) : msg.content,
       }))
     );
+
+    const followUp = resolveFollowUpTurn({
+      message: sanitizedMessage,
+      history: sanitizedHistory,
+    });
+    const isMinimalTurn =
+      isMinimalConversationalMessage(sanitizedMessage) &&
+      !followUp.suppressMinimalTurn;
+
+    let topicRoute = routeChatTopics(sanitizedMessage, hasMatchedActivity, {
+      isMinimalTurn,
+    });
+    if (followUp.suppressMinimalTurn && followUp.carriedTopics.length > 0) {
+      topicRoute = {
+        topics: mergeFollowUpTopics(
+          followUp.carriedTopics,
+          sanitizedMessage,
+          hasMatchedActivity
+        ),
+        hasNamedActivity: hasMatchedActivity,
+      };
+    }
+    const effectiveQuery = followUp.effectiveQuery;
+    const useIntentFilter = shouldUseCalendarIntentFilter(topicRoute, activityMatches.length);
 
     const useAgentPath = isChatAgentEnabled();
     const agentMode = useAgentPath ? agentModeForModelId(modelId) : "compact";
@@ -446,6 +481,7 @@ export async function POST(request: NextRequest) {
 
     const cacheKey = [
       modelId,
+      `mode:${chatMode}`,
       useAgentPath ? `agent:${agentMode}` : "legacy",
       executionMode,
       isComplexTurn ? "complex" : "simple",
@@ -499,7 +535,7 @@ export async function POST(request: NextRequest) {
 
       if (topicRoute.topics.includes("public_holiday")) {
         const phCtx = await buildPublicHolidayChatContext(
-          sanitizedMessage,
+          effectiveQuery,
           todayISO,
           { sessionIds: contextSessionIds }
         );
@@ -524,7 +560,7 @@ export async function POST(request: NextRequest) {
 
       const [dataCtx] = await Promise.all([
         buildDataContextForTurn({
-          message: sanitizedMessage,
+          message: effectiveQuery,
           todayISO,
           route: topicRoute,
           contextSessionIds,
@@ -573,6 +609,7 @@ export async function POST(request: NextRequest) {
         systemPrompt = await buildCompactFallbackSystemPrompt({
           ctx: buildAgentTurnContext({
             message: sanitizedMessage,
+            effectiveQuery,
             todayISO,
             todayFormatted,
             program: selectedProgram,
@@ -601,14 +638,17 @@ export async function POST(request: NextRequest) {
           multipleSessionsSelected,
           contextIntent,
           useIntentFilter,
+          mode: chatMode,
         });
       } else {
-        systemPrompt = buildLegacyContextSystemPrompt();
+        systemPrompt =
+          buildLegacyContextSystemPrompt() + getModeSystemDirective(chatMode);
       }
     }
 
     const agentTurnContext = buildAgentTurnContext({
       message: sanitizedMessage,
+      effectiveQuery,
       todayISO,
       todayFormatted,
       program: selectedProgram,
@@ -630,7 +670,11 @@ export async function POST(request: NextRequest) {
 
     let prefetchDirective = "";
     if (useAgentPath && !useAgentTools) {
-      const prefetch = await runDeterministicPrefetch(agentTurnContext, () => {});
+      const prefetch = await runDeterministicPrefetch(
+        agentTurnContext,
+        () => {},
+        chatMode
+      );
       if (prefetch.outputBlock) {
         prefetchDirective = `\n\n=== PREFETCHED TOOL DATA (authoritative) ===\n${prefetch.outputBlock}`;
       }
@@ -693,7 +737,7 @@ export async function POST(request: NextRequest) {
           effectiveSessions
         );
         const { dataContext } = await buildDataContextForTurn({
-          message: sanitizedMessage,
+          message: effectiveQuery,
           todayISO,
           route: topicRoute,
           contextSessionIds,
@@ -863,6 +907,7 @@ export async function POST(request: NextRequest) {
             history: sanitizedHistory,
             ctx: agentTurnContext,
             modelId: modelId,
+            mode: chatMode,
             correlationId,
             maxTokens: modelBudget.maxTokens,
             temperature: modelBudget.temperature,

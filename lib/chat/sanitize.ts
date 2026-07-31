@@ -24,13 +24,66 @@ const INTERNAL_CONTEXT_BANNER_LINE =
   /^\s*=+\s*.+\s*=+\s*$/;
 
 const INTERNAL_CONTEXT_PHRASES =
-  /\b(?:MATCHED\s+ACTIVITIES|CLOSEST\s+MATCHES|DATA\s+CONTEXT|UITM\s+KNOWLEDGE|SESSION\s+LIST|SELECTED\s+SESSIONS|SESSION\s+COMPARISON|SESSION\s+TIMELINE|SCOPED\s+CALENDAR|UPCOMING\s+HINTS|PREFETCHED\s+TOOL\s+DATA|PRELOADED\s+CALENDAR\s+MATCH|QUICK\s+REFERENCE|MALAYSIA\s+PUBLIC\s+HOLIDAYS|LECTURE\s+WEEKS(?:\s*\[[^\]]*\])?|GROUP\s+[AB]\s+ACADEMIC\s+CALENDAR(?:\s*\(API\))?|CURRENT\s+LECTURE\s+WEEK)\b/gi;
+  /\b(?:MATCHED\s+ACTIVITIES|CLOSEST\s+MATCHES|DATA\s+CONTEXT|UITM\s+KNOWLEDGE|SESSION\s+LIST|SELECTED\s+SESSIONS|SESSION\s+COMPARISON|SESSION\s+TIMELINE|SCOPED\s+CALENDAR|UPCOMING\s+HINTS|TODAY\s+STATUS|PUBLIC\s+HOLIDAY\s+META|PREFETCHED\s+TOOL\s+DATA|PRELOADED\s+CALENDAR\s+MATCH|QUICK\s+REFERENCE|MALAYSIA\s+PUBLIC\s+HOLIDAYS|LECTURE\s+WEEKS(?:\s*\[[^\]]*\])?|GROUP\s+[AB]\s+ACADEMIC\s+CALENDAR(?:\s*\(API\))?|CURRENT\s+LECTURE\s+WEEK)\b/gi;
 
 const INTERNAL_TOOL_NAMES =
-  /\b(?:search_calendar_activities|get_academic_calendar|get_lecture_weeks|get_public_holidays|get_upcoming_events|get_session_timeline|search_uitm_knowledge)\b/gi;
+  /\b(?:search_calendar_activities|get_academic_calendar|get_lecture_weeks|get_today_status|get_public_holiday_meta|get_public_holidays|get_upcoming_events|get_session_timeline|search_uitm_knowledge)\b/gi;
 
 const INTERNAL_API_FIELD_LABEL =
   /\b(?:startDate|endDate|programType|programTypes|allStudents|regionalStartDate|regionalEndDate)\s*:/gi;
+
+const LIST_ITEM_LINE = /^([-*•]|\d+\.)\s+(.+)$/;
+
+/**
+ * Promote list lines that are really section titles into ## headings.
+ * Examples fixed: "- Sokongan …:" or "- #Aliran Kerja…" followed by more list items.
+ * Bare lists without titles are left unchanged.
+ */
+export function promoteListSectionTitles(content: string): string {
+  const lines = content.split("\n");
+  const out: string[] = [];
+
+  for (let i = 0; i < lines.length; i++) {
+    const line = lines[i] ?? "";
+    const trimmed = line.trim();
+    const match = LIST_ITEM_LINE.exec(trimmed);
+    if (!match) {
+      out.push(line);
+      continue;
+    }
+
+    const body = (match[2] ?? "").trim();
+    const nextNonEmpty = lines.slice(i + 1).find((candidate) => candidate.trim().length > 0);
+    const nextIsList = Boolean(
+      nextNonEmpty && LIST_ITEM_LINE.test(nextNonEmpty.trim())
+    );
+    if (!nextIsList) {
+      out.push(line);
+      continue;
+    }
+
+    const hasHashPrefix = /^#+/.test(body) || body.startsWith("#");
+    const titleCore = body.replace(/^#+\s*/, "").replace(/:\s*$/, "").trim();
+    const wordCount = titleCore.split(/\s+/).filter(Boolean).length;
+    const endsWithColon = /:\s*$/.test(body);
+    const looksLikeTitle =
+      (hasHashPrefix && titleCore.length > 0) ||
+      (endsWithColon && wordCount > 0 && wordCount <= 12);
+
+    if (!looksLikeTitle || !titleCore) {
+      out.push(line);
+      continue;
+    }
+
+    if (out.length > 0 && (out[out.length - 1] ?? "").trim() !== "") {
+      out.push("");
+    }
+    out.push(`## ${titleCore}`);
+    out.push("");
+  }
+
+  return out.join("\n").replace(/\n{3,}/g, "\n\n");
+}
 
 /**
  * Strip prompt/context/tool leakage (section banners, variable names, tool ids)
@@ -170,5 +223,5 @@ export function cleanAiReply(rawReply: string): string {
     .replace(/\n{3,}/g, "\n\n")
     .trim();
 
-  return stripInternalContextLeakage(cleaned);
+  return stripInternalContextLeakage(promoteListSectionTitles(cleaned));
 }

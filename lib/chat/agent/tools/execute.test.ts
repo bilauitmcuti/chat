@@ -12,6 +12,36 @@ vi.mock("@/lib/chat/context", async (importOriginal) => {
   };
 });
 
+vi.mock("@/lib/calendar-api-server", () => ({
+  fetchTodayStatus: vi.fn(async () => ({
+    date: "2026-03-15",
+    primaryStatus: "lecture",
+    statuses: ["lecture"],
+    sessionResolved: { id: "B-20263", label: "Sesi", group: "B" },
+    matchedActivities: [
+      {
+        name: "Kuliah",
+        startDate: "2026-03-01",
+        endDate: "2026-06-01",
+        type: "lecture",
+        group: "B",
+      },
+    ],
+  })),
+  fetchPublicHolidayMeta: vi.fn(async () => ({
+    defaultYear: 2026,
+    yearOptions: [{ value: 2026, label: "2026" }],
+    coverageOptions: [{ value: "all" as const, label: "All" }],
+    stateOptions: [{ value: "selangor", label: "Selangor" }],
+  })),
+  fetchPublicHolidays: vi.fn(async () => ({
+    defaultYear: 2026,
+    year: 2026,
+    total: 0,
+    holidays: [],
+  })),
+}));
+
 function baseCtx(overrides: Partial<AgentTurnContext> = {}): AgentTurnContext {
   return {
     message: "bila xyz unknown event?",
@@ -70,5 +100,22 @@ describe("executeSearchCalendarActivities partial fallback", () => {
     );
     expect(result).toContain("MATCHED ACTIVITIES");
     expect(result).toContain("SuFO");
+  });
+});
+
+describe("executeGetTodayStatus", () => {
+  it("returns primaryStatus from today API", async () => {
+    const result = await executeChatTool("get_today_status", {}, baseCtx());
+    expect(result).toContain("TODAY STATUS");
+    expect(result).toContain("lecture");
+    expect(result).toContain("Kuliah");
+  });
+});
+
+describe("executeGetPublicHolidayMeta", () => {
+  it("returns filter options block", async () => {
+    const result = await executeChatTool("get_public_holiday_meta", {}, baseCtx());
+    expect(result).toContain("PUBLIC HOLIDAY META");
+    expect(result).toContain("selangor");
   });
 });

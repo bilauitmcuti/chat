@@ -1,7 +1,7 @@
 "use client";
 
 import type { Dispatch, SetStateAction } from "react";
-import { useRef } from "react";
+import { useRef, useSyncExternalStore } from "react";
 import { HugeiconsIcon } from "@hugeicons/react";
 import { ArrowUp02Icon } from "@hugeicons/core-free-icons";
 import type { SessionId } from "@/lib/data";
@@ -37,8 +37,33 @@ import {
   ModelSelectorLogoPreload,
   ModelSelectorName,
 } from "@/components/ai-elements/model-selector";
+import { Kbd } from "@/components/ui/kbd";
+import {
+  Tooltip,
+  TooltipContent,
+  TooltipTrigger,
+} from "@/components/ui/tooltip";
+import { isDesktopWindowsOrMac } from "@/components/theme-shortcut";
 import { cn } from "@/lib/utils";
 import { MAX_CHAT_MESSAGE_LENGTH } from "@/components/chat/chat-utils";
+
+function getModelShortcutKbdLabel(): string | null {
+  if (!isDesktopWindowsOrMac()) return null;
+  const platform =
+    (navigator as Navigator & { userAgentData?: { platform?: string } }).userAgentData
+      ?.platform ??
+    navigator.platform ??
+    "";
+  return /Mac/i.test(platform) ? "⌘/" : "Ctrl+/";
+}
+
+function useModelShortcutKbdLabel(): string | null {
+  return useSyncExternalStore(
+    () => () => {},
+    getModelShortcutKbdLabel,
+    () => null
+  );
+}
 
 interface ProgramOption {
   value: string;
@@ -157,6 +182,7 @@ export function ChatComposerForm({
   formClassName,
 }: ChatComposerFormProps) {
   const submenuSwitchingRef = useRef(false);
+  const modelShortcutKbd = useModelShortcutKbdLabel();
   const sendDisabled =
     !input.trim() ||
     isLoading ||
@@ -250,38 +276,43 @@ export function ChatComposerForm({
             )}
           </ResponsiveOverlayShell>
           <InputGroupAddon align="block-end" className="justify-between pt-0">
-            <DropdownMenu
-              open={dropdownOpen}
-              onOpenChange={(open, details) =>
-                handleProgramDropdownRootOpenChange(open, details, {
-                  activeSubmenu,
-                  keepDropdownOpenRef,
-                  setDropdownOpen: onDropdownOpenChange,
-                  setActiveSubmenu: onActiveSubmenuChange,
-                })
-              }
-            >
-              <DropdownMenuTrigger
-                render={
-                  <Button
-                    type="button"
-                    variant="ghost"
-                    size="sm"
-                    className={cn(
-                      "h-8 min-w-0 max-w-[180px] sm:max-w-[260px] md:max-w-[300px] overflow-hidden",
-                      selectorTriggerClassName
-                    )}
-                  />
+            <Tooltip disabled={dropdownOpen}>
+              <DropdownMenu
+                open={dropdownOpen}
+                onOpenChange={(open, details) =>
+                  handleProgramDropdownRootOpenChange(open, details, {
+                    activeSubmenu,
+                    keepDropdownOpenRef,
+                    setDropdownOpen: onDropdownOpenChange,
+                    setActiveSubmenu: onActiveSubmenuChange,
+                  })
                 }
               >
-                <span className="block min-w-0 flex-1 truncate text-left text-sm text-primary md:text-[0.9375rem]">
-                  {currentProgramLabel}
-                </span>
-              </DropdownMenuTrigger>
-              <DropdownMenuContent
-                className="min-w-[260px] overflow-visible pt-4 pb-4 pl-3 pr-3 bg-popover dark:bg-[#2A2A2A]"
-                align="start"
-              >
+                <TooltipTrigger
+                  render={
+                    <DropdownMenuTrigger
+                      render={
+                        <Button
+                          type="button"
+                          variant="ghost"
+                          size="sm"
+                          className={cn(
+                            "h-8 min-w-0 max-w-[180px] sm:max-w-[260px] md:max-w-[300px] overflow-hidden",
+                            selectorTriggerClassName
+                          )}
+                        />
+                      }
+                    />
+                  }
+                >
+                  <span className="block min-w-0 flex-1 truncate text-left text-sm text-primary md:text-[0.9375rem]">
+                    {currentProgramLabel}
+                  </span>
+                </TooltipTrigger>
+                <DropdownMenuContent
+                  className="min-w-[260px] overflow-visible pt-4 pb-4 pl-3 pr-3 bg-popover dark:bg-[#2A2A2A]"
+                  align="start"
+                >
                 <div className="-mx-1 px-1">
                   <div className="mb-2">
                     <div className="text-xs font-semibold text-muted-foreground mb-2 px-2">
@@ -466,64 +497,76 @@ export function ChatComposerForm({
                   </div>
                 </div>
               </DropdownMenuContent>
-            </DropdownMenu>
-            <div className="flex min-w-0 items-center gap-1 shrink">
-              <DropdownMenu
-                open={modelDropdownOpen}
-                onOpenChange={onModelDropdownOpenChange}
-              >
-                <DropdownMenuTrigger
-                  render={
-                    <Button
-                      type="button"
-                      variant="ghost"
-                      size="sm"
-                      className={cn(
-                        "h-8 min-w-0 max-w-[140px] sm:max-w-[180px] overflow-hidden",
-                        selectorTriggerClassName
-                      )}
-                    />
-                  }
-                >
-                  <span className="block min-w-0 truncate text-left text-sm text-primary md:text-[0.9375rem]">
-                    {selectedModelLabel}
-                  </span>
-                </DropdownMenuTrigger>
-                <DropdownMenuContent
-                  className="min-w-[260px] pt-4 pb-4 pl-3 pr-3 bg-popover dark:bg-[#2A2A2A]"
-                  align="end"
-                >
-                  {chatModels.map((model) => (
-                    <DropdownMenuItem
-                      key={model.id}
-                      className={cn(
-                        "relative cursor-pointer flex items-start gap-2 py-2 pr-8",
-                        model.id === selectedModelId ? "text-primary" : ""
-                      )}
-                      onClick={() => onModelSelect(model.id)}
-                    >
-                      <ModelSelectorLogo
-                        provider={model.provider}
-                        className="size-4 shrink-0 mt-0.5"
-                      />
-                      <div className="flex min-w-0 flex-1 flex-col gap-0.5 text-left">
-                        <ModelSelectorName className="font-medium text-sm">
-                          {model.name}
-                        </ModelSelectorName>
-                        <span className="text-xs text-muted-foreground leading-snug">
-                          {model.description}
-                        </span>
-                      </div>
-                      {model.id === selectedModelId ? (
-                        <span
-                          className="pointer-events-none absolute right-2 top-1/2 -translate-y-1/2 flex size-3 shrink-0 items-center justify-center rounded-full border border-primary bg-primary"
-                          aria-hidden
-                        />
-                      ) : null}
-                    </DropdownMenuItem>
-                  ))}
-                </DropdownMenuContent>
               </DropdownMenu>
+              <TooltipContent side="top">Choose Programme & Session</TooltipContent>
+            </Tooltip>
+            <div className="flex min-w-0 items-center gap-1 shrink">
+              <Tooltip disabled={modelDropdownOpen}>
+                <DropdownMenu
+                  open={modelDropdownOpen}
+                  onOpenChange={onModelDropdownOpenChange}
+                >
+                  <TooltipTrigger
+                    render={
+                      <DropdownMenuTrigger
+                        render={
+                          <Button
+                            type="button"
+                            variant="ghost"
+                            size="sm"
+                            className={cn(
+                              "h-8 min-w-0 max-w-[140px] sm:max-w-[180px] overflow-hidden",
+                              selectorTriggerClassName
+                            )}
+                          />
+                        }
+                      />
+                    }
+                  >
+                    <span className="block min-w-0 truncate text-left text-sm text-primary md:text-[0.9375rem]">
+                      {selectedModelLabel}
+                    </span>
+                  </TooltipTrigger>
+                  <DropdownMenuContent
+                    className="min-w-[260px] pt-4 pb-4 pl-3 pr-3 bg-popover dark:bg-[#2A2A2A]"
+                    align="end"
+                  >
+                    {chatModels.map((model) => (
+                      <DropdownMenuItem
+                        key={model.id}
+                        className={cn(
+                          "relative cursor-pointer flex items-start gap-2 py-2 pr-8",
+                          model.id === selectedModelId ? "text-primary" : ""
+                        )}
+                        onClick={() => onModelSelect(model.id)}
+                      >
+                        <ModelSelectorLogo
+                          provider={model.provider}
+                          className="size-4 shrink-0 mt-0.5"
+                        />
+                        <div className="flex min-w-0 flex-1 flex-col gap-0.5 text-left">
+                          <ModelSelectorName className="font-medium text-sm">
+                            {model.name}
+                          </ModelSelectorName>
+                          <span className="text-xs text-muted-foreground leading-snug">
+                            {model.description}
+                          </span>
+                        </div>
+                        {model.id === selectedModelId ? (
+                          <span
+                            className="pointer-events-none absolute right-2 top-1/2 -translate-y-1/2 flex size-3 shrink-0 items-center justify-center rounded-full border border-primary bg-primary"
+                            aria-hidden
+                          />
+                        ) : null}
+                      </DropdownMenuItem>
+                    ))}
+                  </DropdownMenuContent>
+                </DropdownMenu>
+                <TooltipContent side="top" className="gap-1.5">
+                  Switch Model
+                  {modelShortcutKbd ? <Kbd>{modelShortcutKbd}</Kbd> : null}
+                </TooltipContent>
+              </Tooltip>
               <InputGroupButton
                 type="submit"
                 variant="default"

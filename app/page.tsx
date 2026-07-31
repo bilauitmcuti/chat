@@ -27,6 +27,7 @@ import { ChatTranscript } from "@/components/chat/chat-transcript";
 import { ChatEmptyDesktop } from "@/components/chat/chat-empty-desktop";
 import { ChatEmptyMobile } from "@/components/chat/chat-empty-mobile";
 import { ChatComposer } from "@/components/chat/chat-composer";
+import { ModelShortcut } from "@/components/model-shortcut";
 import { getRandomSuggestions } from "@/components/chat/suggestion-data";
 import { DESKTOP_VIEWPORT_QUERY, useDesktopViewport } from "@/lib/use-mobile-viewport";
 import {
@@ -1152,8 +1153,18 @@ export default function ChatPage() {
     onModelSelect: handleModelSelect,
   };
 
+  const chatModelIds = useMemo(
+    () => chatModels.map((model) => model.id),
+    [chatModels]
+  );
+
   return (
     <div className="relative flex h-dvh flex-col overflow-hidden bg-background text-foreground" data-nosnippet>
+      <ModelShortcut
+        modelIds={chatModelIds}
+        selectedModelId={selectedModelId}
+        onSelect={handleModelSelect}
+      />
       {showBackButton ? (
         <div
           className={`chat-header absolute top-0 left-0 right-0 z-10 px-4 md:px-0 ${

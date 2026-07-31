@@ -17,6 +17,8 @@ import { contentToMarkdown } from "@/lib/chat/markdown-suitability";
 import { cn } from "@/lib/utils";
 import { CHAT_STREAM_ANIMATION } from "@/components/ui/streamdown-motion";
 
+const MARKER_ONLY_FRAGMENT = /^(?:[-*+]|\d+[.)]|#{1,6}|>|\|)+$/;
+
 const TABLE_CELL_MAX =
   "h-auto min-h-10 max-w-[12rem] sm:max-w-[16rem] whitespace-normal break-words align-top";
 
@@ -166,8 +168,11 @@ export function StreamdownRenderer({
   const trimmed = content.trim();
   if (!trimmed) return null;
 
-  const markdown = contentToMarkdown(trimmed);
   const isStreaming = !isComplete;
+  // A structure-only first token ("-", "1.", "##") would paint a stray marker.
+  if (isStreaming && MARKER_ONLY_FRAGMENT.test(trimmed)) return null;
+
+  const markdown = contentToMarkdown(trimmed);
   const shouldAnimate = isStreaming && !prefersReducedMotion;
 
   return (

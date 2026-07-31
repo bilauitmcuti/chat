@@ -86,4 +86,48 @@ describe("buildToolRegistryForTurn", () => {
     );
     expect(tools).toContain("search_calendar_activities");
   });
+
+  it("returns no tools for rewrite and translate modes", () => {
+    expect(buildToolRegistryForTurn(baseCtx(), "rewrite")).toEqual([]);
+    expect(buildToolRegistryForTurn(baseCtx(), "translate")).toEqual([]);
+  });
+
+  it("exposes plan tools for plan mode", () => {
+    const tools = buildToolRegistryForTurn(baseCtx(), "plan");
+    expect(tools).toContain("get_lecture_weeks");
+    expect(tools).toContain("get_session_timeline");
+    expect(tools).toContain("get_academic_calendar");
+    expect(tools).toContain("get_today_status");
+    expect(tools).not.toContain("get_public_holidays");
+  });
+
+  it("exposes holiday tools in plan mode when topic includes public_holiday", () => {
+    const tools = buildToolRegistryForTurn(
+      baseCtx({
+        topicRoute: { topics: ["public_holiday"], hasNamedActivity: false },
+      }),
+      "plan"
+    );
+    expect(tools).toContain("get_public_holidays");
+    expect(tools).toContain("get_public_holiday_meta");
+    expect(tools).toContain("get_lecture_weeks");
+  });
+
+  it("exposes get_today_status for day-status messages", () => {
+    const tools = buildToolRegistryForTurn(
+      baseCtx({ message: "ada kelas hari ini?" })
+    );
+    expect(tools).toContain("get_today_status");
+  });
+
+  it("exposes public holiday meta + holidays for public_holiday topic", () => {
+    const tools = buildToolRegistryForTurn(
+      baseCtx({
+        topicRoute: { topics: ["public_holiday"], hasNamedActivity: false },
+      })
+    );
+    expect(tools).toContain("get_public_holiday_meta");
+    expect(tools).toContain("get_public_holidays");
+    expect(tools).not.toContain("get_calendar_meta" as never);
+  });
 });

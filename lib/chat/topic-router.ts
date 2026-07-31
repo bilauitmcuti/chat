@@ -170,6 +170,46 @@ export function messageAsksAcademicCalendar(message: string): boolean {
   return false;
 }
 
+const DAY_STATUS_PHRASES = [
+  "ada kelas",
+  "class today",
+  "is there class",
+  "status hari ini",
+  "status hari",
+  "cuti ke hari",
+  "cuti ke hari ni",
+  "cuti hari ni",
+  "hari ni cuti",
+  "today class",
+  "kelas hari ini",
+  "kelas esok",
+  "class tomorrow",
+  "what kind of day",
+  "jenis hari",
+];
+
+/** Day-status / “is there class” questions — prefer get_today_status. */
+export function messageAsksDayStatus(message: string): boolean {
+  const lower = message.toLowerCase();
+  if (includesAny(lower, DAY_STATUS_PHRASES)) return true;
+  if (
+    /\b(ada|is there|any)\b/.test(lower) &&
+    /\b(kelas|class|kuliah)\b/.test(lower) &&
+    /\b(hari ini|today|esok|besok|tomorrow|semalam|yesterday)\b/.test(lower)
+  ) {
+    return true;
+  }
+  if (
+    /\b(cuti|break|off)\b/.test(lower) &&
+    /\b(hari ini|today|esok|besok|tomorrow)\b/.test(lower) &&
+    !messageAsksPublicHoliday(message) &&
+    !includesAny(lower, ACADEMIC_BREAK_PHRASES)
+  ) {
+    return true;
+  }
+  return false;
+}
+
 /**
  * Route a user message to one or more topics. Default for ambiguous UiTM chat
  * is academic calendar when program/session context exists.
@@ -189,8 +229,10 @@ export function routeChatTopics(
   const wantsLecture = messageAsksLectureWeeks(message);
   const wantsHoliday = messageAsksPublicHoliday(message);
   const wantsGeneral = messageAsksUitmGeneral(message);
+  const wantsDayStatus = messageAsksDayStatus(message);
   const wantsAcademic =
     hasNamedActivity ||
+    wantsDayStatus ||
     messageAsksAcademicCalendar(message) ||
     (!wantsLecture && !wantsHoliday && !wantsGeneral);
 

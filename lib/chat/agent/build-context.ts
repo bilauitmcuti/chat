@@ -7,6 +7,7 @@ import type { Activity, SessionId } from "@/lib/data";
 
 export function buildAgentTurnContext(params: {
   message: string;
+  effectiveQuery?: string;
   todayISO: string;
   todayFormatted: string;
   program: string;
@@ -27,6 +28,7 @@ export function buildAgentTurnContext(params: {
 }): AgentTurnContext {
   return {
     message: params.message,
+    effectiveQuery: params.effectiveQuery ?? params.message,
     todayISO: params.todayISO,
     todayFormatted: params.todayFormatted,
     program: params.program,

@@ -1,5 +1,6 @@
 import { describe, expect, it } from "vitest";
 import {
+  messageAsksDayStatus,
   messageAsksLectureWeeks,
   messageAsksPublicHoliday,
   routeChatTopics,
@@ -31,6 +32,11 @@ describe("routeChatTopics", () => {
     expect(route.topics).toContain("public_holiday");
   });
 
+  it("routes day-status questions to academic_calendar", () => {
+    const route = routeChatTopics("ada kelas hari ini?", false);
+    expect(route.topics).toContain("academic_calendar");
+  });
+
   it("routes greetings and test phrases away from academic calendar", () => {
     expect(routeChatTopics("hi", false, { isMinimalTurn: true }).topics).toEqual(
       []
@@ -48,6 +54,18 @@ describe("routeChatTopics", () => {
       isMinimalTurn: false,
     });
     expect(route.topics).toContain("academic_calendar");
+  });
+});
+
+describe("messageAsksDayStatus", () => {
+  it("detects ada kelas / class today", () => {
+    expect(messageAsksDayStatus("ada kelas hari ini?")).toBe(true);
+    expect(messageAsksDayStatus("is there class today?")).toBe(true);
+    expect(messageAsksDayStatus("status hari ini")).toBe(true);
+  });
+
+  it("does not treat named academic break as day-status alone", () => {
+    expect(messageAsksDayStatus("bila cuti semester")).toBe(false);
   });
 });
 

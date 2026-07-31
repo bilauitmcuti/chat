@@ -43,4 +43,29 @@ describe("contentToMarkdown", () => {
     expect(out).toContain("Cuti Semester");
     expect(out).toContain("01-06-2026");
   });
+
+  it("promotes title-like list lines to headings above real bullets", () => {
+    const input = [
+      "- Sokongan Persekitaran Multi-repo:",
+      "- Cursor boleh dimulakan dalam persekitaran multi-repo yang dinamakan.",
+      "- Cursor boleh dipindahkan antara persekitaran.",
+      "- #Aliran Kerja Antara Saluran:",
+      "- Cursor boleh membaca dan menghantar mesej ke saluran Slack.",
+      "- Cursor boleh mencipta saluran dan thread baharu.",
+    ].join("\n");
+    const out = contentToMarkdown(input);
+    expect(out).toContain("## Sokongan Persekitaran Multi-repo");
+    expect(out).toContain("## Aliran Kerja Antara Saluran");
+    expect(out).not.toMatch(/^- Sokongan Persekitaran Multi-repo/m);
+    expect(out).not.toMatch(/^- #Aliran Kerja/m);
+    expect(out).toContain(
+      "- Cursor boleh dimulakan dalam persekitaran multi-repo yang dinamakan."
+    );
+    expect(out).toContain("- Cursor boleh membaca dan menghantar mesej ke saluran Slack.");
+  });
+
+  it("leaves bare lists without section titles unchanged", () => {
+    const input = "- Cuti Semester: 01-06-2026\n- Peperiksaan: 15-10-2026";
+    expect(contentToMarkdown(input)).toBe(input);
+  });
 });

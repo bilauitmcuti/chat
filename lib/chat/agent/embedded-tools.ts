@@ -9,6 +9,8 @@ export const CHAT_TOOL_STATUS_LABELS: Record<ChatToolName, string> = {
   get_upcoming_events: "Finding upcoming events…",
   get_session_timeline: "Loading session timeline…",
   get_lecture_weeks: "Looking up lecture weeks…",
+  get_today_status: "Checking today's status…",
+  get_public_holiday_meta: "Loading holiday filter options…",
   get_public_holidays: "Reading public holidays…",
   search_uitm_knowledge: "Searching UiTM knowledge…",
 };

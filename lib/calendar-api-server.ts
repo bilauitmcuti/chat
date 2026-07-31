@@ -10,14 +10,21 @@ import {
   CalendarApiError,
   normalizeDefaultSession,
   parseCalendarSessionResponse,
+  parsePublicHolidayMetaResponse,
+  parsePublicHolidaysResponse,
+  parseTodayResponse,
+  buildPublicHolidaySearchParams,
   type CalendarSessionResult,
   type FetchCalendarSessionParams,
   type FetchMetaOptions,
+  type FetchPublicHolidaysOptions,
+  type FetchTodayStatusParams,
   type MetaResponse,
   type ProgramOptionRow,
+  type PublicHolidayMetaResponse,
   type PublicHolidaysResponse,
   type SessionOptionRow,
-  parsePublicHolidaysResponse,
+  type TodayResponse,
 } from "@/lib/calendar-api";
 import type { LectureWeeksResponse } from "@/lib/calendar-api";
 
@@ -82,10 +89,9 @@ const PUBLIC_HOLIDAYS_TTL_MS = 5 * 60 * 1000;
 
 /** Server-only upstream fetch for chat (never routed through the browser proxy). */
 export async function fetchPublicHolidays(
-  options?: { coverage?: "all"; year?: number }
+  options?: FetchPublicHolidaysOptions
 ): Promise<PublicHolidaysResponse> {
-  const q = new URLSearchParams({ coverage: options?.coverage ?? "all" });
-  if (options?.year != null) q.set("year", String(options.year));
+  const q = buildPublicHolidaySearchParams(options);
   const cacheKey = q.toString();
 
   const now = Date.now();
@@ -107,6 +113,72 @@ export async function fetchPublicHolidays(
   })();
 
   publicHolidaysInflight.set(cacheKey, promise);
+  return promise;
+}
+
+const publicHolidayMetaInflight = new Map<string, Promise<PublicHolidayMetaResponse>>();
+const publicHolidayMetaCache = new Map<
+  string,
+  { data: PublicHolidayMetaResponse; at: number }
+>();
+const PUBLIC_HOLIDAY_META_TTL_MS = 5 * 60 * 1000;
+
+export async function fetchPublicHolidayMeta(): Promise<PublicHolidayMetaResponse> {
+  const cacheKey = "default";
+  const now = Date.now();
+  const cached = publicHolidayMetaCache.get(cacheKey);
+  if (cached && now - cached.at < PUBLIC_HOLIDAY_META_TTL_MS) return cached.data;
+
+  const existing = publicHolidayMetaInflight.get(cacheKey);
+  if (existing) return existing;
+
+  const promise = (async () => {
+    try {
+      const data = await fetchUpstreamJson("v1/public-holiday/meta");
+      const result = parsePublicHolidayMetaResponse(data);
+      publicHolidayMetaCache.set(cacheKey, { data: result, at: Date.now() });
+      return result;
+    } finally {
+      publicHolidayMetaInflight.delete(cacheKey);
+    }
+  })();
+
+  publicHolidayMetaInflight.set(cacheKey, promise);
+  return promise;
+}
+
+const todayStatusInflight = new Map<string, Promise<TodayResponse>>();
+const todayStatusCache = new Map<string, { data: TodayResponse; at: number }>();
+const TODAY_STATUS_TTL_MS = 60 * 1000;
+
+export async function fetchTodayStatus(
+  params: FetchTodayStatusParams
+): Promise<TodayResponse> {
+  const q = new URLSearchParams({ group: params.group });
+  if (params.date) q.set("date", params.date);
+  if (params.session) q.set("session", params.session);
+  if (params.program) q.set("program", params.program);
+  const cacheKey = q.toString();
+
+  const now = Date.now();
+  const cached = todayStatusCache.get(cacheKey);
+  if (cached && now - cached.at < TODAY_STATUS_TTL_MS) return cached.data;
+
+  const existing = todayStatusInflight.get(cacheKey);
+  if (existing) return existing;
+
+  const promise = (async () => {
+    try {
+      const data = await fetchUpstreamJson("v1/today", q);
+      const result = parseTodayResponse(data);
+      todayStatusCache.set(cacheKey, { data: result, at: Date.now() });
+      return result;
+    } finally {
+      todayStatusInflight.delete(cacheKey);
+    }
+  })();
+
+  todayStatusInflight.set(cacheKey, promise);
   return promise;
 }
 

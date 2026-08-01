@@ -1243,7 +1243,6 @@ export default function ChatPage() {
               copiedId={copiedId}
               reactions={reactions}
               showTurnstileChallenge={showTurnstileChallenge}
-              showTurnstileSlot={showTurnstileSlot}
               turnstileSiteKey={turnstileSiteKey ?? ""}
               turnstileNonce={turnstileNonce}
               turnstileRef={turnstileRef}

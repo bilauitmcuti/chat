@@ -3,7 +3,6 @@
 import { useEffect, useRef, useState } from "react";
 
 const INITIAL_BUILD_ID = (process.env.NEXT_PUBLIC_BUILD_ID ?? "").trim();
-const DISMISS_STORAGE_KEY = "chat_version_dismissed";
 
 interface VersionResponse {
   buildId?: string;
@@ -12,40 +11,17 @@ interface VersionResponse {
 /** Production only; longer interval to cut noise and server load. */
 const POLL_INTERVAL_MS = 60_000;
 
-function readDismissedBuildId(): string {
-  try {
-    return sessionStorage.getItem(DISMISS_STORAGE_KEY)?.trim() ?? "";
-  } catch {
-    return "";
-  }
-}
-
-function writeDismissedBuildId(buildId: string) {
-  try {
-    sessionStorage.setItem(DISMISS_STORAGE_KEY, buildId);
-  } catch {
-    // private mode / quota — ignore
-  }
-}
-
 /**
  * Quiet deploy notice: no countdown, no auto-reload (avoids tab-resume flicker).
  * Shows only when API buildId differs from the inlined client id.
  */
 export function VersionBanner() {
   const [remoteBuildId, setRemoteBuildId] = useState<string | null>(null);
-  const [dismissedId, setDismissedId] = useState<string>("");
   const intervalRef = useRef<ReturnType<typeof setInterval> | null>(null);
   const announcedIdRef = useRef<string | null>(null);
 
   const isVisible =
-    Boolean(remoteBuildId) &&
-    remoteBuildId !== INITIAL_BUILD_ID &&
-    remoteBuildId !== dismissedId;
-
-  useEffect(() => {
-    setDismissedId(readDismissedBuildId());
-  }, []);
+    Boolean(remoteBuildId) && remoteBuildId !== INITIAL_BUILD_ID;
 
   useEffect(() => {
     if (process.env.NODE_ENV !== "production") return;
@@ -65,8 +41,6 @@ export function VersionBanner() {
         const { buildId } = (await res.json()) as VersionResponse;
         const nextId = (buildId ?? "").trim();
         if (!nextId || nextId === INITIAL_BUILD_ID) return;
-        const dismissed = readDismissedBuildId();
-        if (nextId === dismissed) return;
         // Avoid re-setting the same mismatch (prevents needless re-renders / flash).
         if (announcedIdRef.current === nextId) return;
         announcedIdRef.current = nextId;
@@ -110,13 +84,6 @@ export function VersionBanner() {
     window.location.reload();
   }
 
-  function handleDismiss() {
-    if (!remoteBuildId) return;
-    writeDismissedBuildId(remoteBuildId);
-    setDismissedId(remoteBuildId);
-    setRemoteBuildId(null);
-  }
-
   if (!isVisible || !remoteBuildId) return null;
 
   return (
@@ -128,13 +95,6 @@ export function VersionBanner() {
         className="rounded-md bg-primary px-2 py-0.5 text-primary-foreground hover:opacity-90"
       >
         Refresh
-      </button>
-      <button
-        type="button"
-        onClick={handleDismiss}
-        className="rounded-md px-2 py-0.5 text-muted-foreground underline-offset-2 hover:underline"
-      >
-        Dismiss
       </button>
     </div>
   );

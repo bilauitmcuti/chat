@@ -27,7 +27,6 @@ interface ChatTranscriptProps {
   copiedId: string | null;
   reactions: Record<string, "up" | "down" | null>;
   showTurnstileChallenge: boolean;
-  showTurnstileSlot?: boolean;
   turnstileSiteKey: string;
   turnstileNonce: number;
   turnstileRef: React.RefObject<TurnstileWidgetHandle | null>;
@@ -49,7 +48,6 @@ export function ChatTranscript({
   copiedId,
   reactions,
   showTurnstileChallenge,
-  showTurnstileSlot = false,
   turnstileSiteKey,
   turnstileNonce,
   turnstileRef,
@@ -69,21 +67,6 @@ export function ChatTranscript({
             aria-busy={isLoading}
             className="mx-auto w-full max-w-[600px] gap-6 pt-14 pb-6 px-2 md:px-0"
           >
-            {showTurnstileSlot ? (
-              <MessageScrollerItem>
-                <div className="flex min-h-[65px] w-full max-w-[320px] items-start">
-                  {showTurnstileChallenge ? (
-                    <TurnstileWidget
-                      ref={turnstileRef}
-                      key={turnstileNonce}
-                      siteKey={turnstileSiteKey}
-                      action="chat_message"
-                      onToken={onTurnstileToken}
-                    />
-                  ) : null}
-                </div>
-              </MessageScrollerItem>
-            ) : null}
             {messages.map((msg) => (
               <ChatMessageRow
                 key={msg.id}
@@ -110,6 +93,20 @@ export function ChatTranscript({
             ) : null}
           </MessageScrollerContent>
         </MessageScrollerViewport>
+        {/* Overlay, not a transcript row — the challenge never reserves or shifts message layout. */}
+        {showTurnstileChallenge ? (
+          <div className="pointer-events-none absolute inset-x-0 bottom-0 z-20 flex justify-center px-2 pb-2">
+            <div className="pointer-events-auto w-full max-w-[320px] rounded-lg border border-border bg-background/95 p-1 shadow-sm backdrop-blur">
+              <TurnstileWidget
+                ref={turnstileRef}
+                key={turnstileNonce}
+                siteKey={turnstileSiteKey}
+                action="chat_message"
+                onToken={onTurnstileToken}
+              />
+            </div>
+          </div>
+        ) : null}
         <MessageScrollerButton />
       </MessageScroller>
     </MessageScrollerProvider>

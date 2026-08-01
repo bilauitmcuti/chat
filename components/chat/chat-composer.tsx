@@ -80,6 +80,8 @@ interface MentionItem {
 export interface ChatComposerFormProps {
   input: string;
   placeholder: string;
+  /** Wider hint shown from `lg` up; swapped by CSS so first paint never changes text. */
+  placeholderDesktop?: string;
   isLoading: boolean;
   waitForTurnstileConfig: boolean;
   requiresTurnstile: boolean;
@@ -131,6 +133,15 @@ export interface ChatComposerFormProps {
   onModelSelect: (modelId: string) => void;
   /** Fired when the composer textarea receives focus (e.g. defer Turnstile mount). */
   onTextareaFocus?: () => void;
+  /** Warm calendar meta before the programme dropdown opens (hover/focus). */
+  onProgramMenuWarm?: () => void;
+  /**
+   * False for the empty shell that is CSS-hidden at the current breakpoint: its
+   * trigger has no box, so an open popup would anchor at the viewport corner.
+   */
+  popupsEnabled?: boolean;
+  /** When programme catalogue is empty: show pending/error row instead of blank sections. */
+  programCataloguePending?: "loading" | "unavailable" | null;
   className?: string;
   formClassName?: string;
 }
@@ -141,6 +152,7 @@ const selectorTriggerClassName =
 export function ChatComposerForm({
   input,
   placeholder,
+  placeholderDesktop,
   isLoading,
   waitForTurnstileConfig,
   requiresTurnstile: _requiresTurnstile,
@@ -181,11 +193,18 @@ export function ChatComposerForm({
   onModelDropdownOpenChange,
   onModelSelect,
   onTextareaFocus,
+  onProgramMenuWarm,
+  programCataloguePending = null,
+  popupsEnabled = true,
   className,
   formClassName,
 }: ChatComposerFormProps) {
   const submenuSwitchingRef = useRef(false);
   const modelShortcutKbd = useModelShortcutKbdLabel();
+  const cataloguePendingLabel =
+    programCataloguePending === "unavailable"
+      ? "Sessions unavailable"
+      : "Loading sessions…";
   const sendDisabled =
     !input.trim() ||
     isLoading ||
@@ -226,6 +245,21 @@ export function ChatComposerForm({
                 )
               )}
             </div>
+            {input.length === 0 ? (
+              <div
+                aria-hidden
+                className="pointer-events-none absolute inset-x-0 top-0 z-0 px-3 pt-3 pb-1 text-sm leading-relaxed text-muted-foreground md:text-[0.9375rem]"
+              >
+                {placeholderDesktop ? (
+                  <>
+                    <span className="lg:hidden">{placeholder}</span>
+                    <span className="hidden lg:inline">{placeholderDesktop}</span>
+                  </>
+                ) : (
+                  placeholder
+                )}
+              </div>
+            ) : null}
             <InputGroupTextarea
               ref={textareaRef}
               data-composer-slot={composerSlot}
@@ -243,14 +277,14 @@ export function ChatComposerForm({
               }
               onKeyDown={onKeyDown}
               onFocus={() => onTextareaFocus?.()}
-              placeholder={placeholder}
+              aria-label={placeholder}
               disabled={isLoading}
               rows={1}
               className="chat-input relative z-10 min-h-[64px] max-h-[130px] resize-none border-0 bg-transparent px-3 pt-3 pb-1 text-sm leading-relaxed shadow-none focus-visible:ring-0 md:text-[0.9375rem]"
             />
           </div>
           <ResponsiveOverlayShell
-            open={isMentionOpen}
+            open={isMentionOpen && popupsEnabled}
             onOpenChange={onMentionOpenChange}
             isMobile={isMobileMentionPicker}
             title="Mention Session Calendar"
@@ -282,7 +316,7 @@ export function ChatComposerForm({
           <InputGroupAddon align="block-end" className="justify-between pt-0">
             <Tooltip disabled={dropdownOpen}>
               <DropdownMenu
-                open={dropdownOpen}
+                open={dropdownOpen && popupsEnabled}
                 onOpenChange={(open, details) =>
                   handleProgramDropdownRootOpenChange(open, details, {
                     activeSubmenu,
@@ -304,6 +338,8 @@ export function ChatComposerForm({
                             "h-8 min-w-0 max-w-[180px] sm:max-w-[260px] md:max-w-[300px] overflow-hidden",
                             selectorTriggerClassName
                           )}
+                          onPointerEnter={onProgramMenuWarm}
+                          onFocus={onProgramMenuWarm}
                         />
                       }
                     />
@@ -322,6 +358,11 @@ export function ChatComposerForm({
                     <div className="text-xs font-semibold text-muted-foreground mb-2 px-2">
                       GROUP A
                     </div>
+                    {groupAOptions.length === 0 && programCataloguePending ? (
+                      <DropdownMenuItem disabled className="text-muted-foreground">
+                        {cataloguePendingLabel}
+                      </DropdownMenuItem>
+                    ) : null}
                     {groupAOptions.map((opt) => {
                       const groupASessionSummary = formatGroupASessionTriggerLabel(
                         opt.value as ProgramValue,
@@ -448,6 +489,12 @@ export function ChatComposerForm({
                           collisionPadding={{ top: 8, right: 28, bottom: 8, left: 8 }}
                           className="min-w-[220px] bg-popover dark:bg-[#2A2A2A]"
                         >
+                          {getSessionOptionsForGroup("B").length === 0 &&
+                          programCataloguePending ? (
+                            <DropdownMenuItem disabled className="text-muted-foreground">
+                              {cataloguePendingLabel}
+                            </DropdownMenuItem>
+                          ) : null}
                           {getSessionOptionsForGroup("B").map((sess) => {
                             const isSelected = selectedSessions.includes(sess.id);
                             return (
@@ -507,7 +554,7 @@ export function ChatComposerForm({
             <div className="flex min-w-0 items-center gap-1 shrink">
               <Tooltip disabled={modelDropdownOpen}>
                 <DropdownMenu
-                  open={modelDropdownOpen}
+                  open={modelDropdownOpen && popupsEnabled}
                   onOpenChange={onModelDropdownOpenChange}
                 >
                   <TooltipTrigger

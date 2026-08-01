@@ -24,17 +24,32 @@ import {
 import { trackZarazEvent, ZARAZ_EVENTS } from "@/lib/zaraz";
 import { useTurnstileSiteKeyFromContext } from "@/hooks/use-turnstile-site-key";
 import type { TurnstileWidgetHandle } from "@/components/turnstile-widget";
-import { ChatEmptyDesktop } from "@/components/chat/chat-empty-desktop";
 import { ChatEmptyMobile } from "@/components/chat/chat-empty-mobile";
 import { ChatComposer } from "@/components/chat/chat-composer";
 import { ModelShortcut } from "@/components/model-shortcut";
 import { getRandomSuggestions } from "@/components/chat/suggestion-data";
-import { DESKTOP_VIEWPORT_QUERY, useDesktopViewport } from "@/lib/use-mobile-viewport";
+import { DESKTOP_VIEWPORT_QUERY } from "@/lib/use-mobile-viewport";
+import {
+  ensureCalendarMeta,
+  getCalendarMetaStatus,
+  subscribeCalendarMetaStatus,
+} from "@/lib/calendar-meta";
+
+let transcriptPrefetched = false;
+
+function prefetchTranscriptChunk(): void {
+  if (transcriptPrefetched) return;
+  transcriptPrefetched = true;
+  void import("@/components/chat/chat-transcript");
+}
 
 const ChatTranscript = dynamic(
   () =>
     import("@/components/chat/chat-transcript").then((mod) => mod.ChatTranscript),
-  { ssr: false }
+  {
+    ssr: false,
+    loading: () => <div aria-hidden className="min-h-0 flex-1" />,
+  }
 );
 import {
   CHAT_TURNSTILE_COOKIE,
@@ -104,7 +119,6 @@ export default function ChatPage() {
     () => hydrationServerVersion
   );
 
-  const isDesktopViewport = useDesktopViewport();
   const pathname = usePathname();
   const showBackButton = pathname === "/chat" || pathname === "/chat/";
   const programOptions = getProgramOptions();
@@ -170,10 +184,8 @@ export default function ChatPage() {
     const opt = getProgramOptions().find((p) => p.value === selectedProgram);
     return opt?.group ?? getGroupFromProgram(selectedProgram);
   }, [selectedProgram, calendarDataVersion]);
-  const [suggestions, setSuggestions] = useState<string[]>(() =>
-    getRandomSuggestions(getGroupFromProgram("All"), [])
-  );
-  const lastSuggestionGroupRef = useRef<"A" | "B">(getGroupFromProgram("All"));
+  const [suggestions, setSuggestions] = useState<string[]>([]);
+  const lastSuggestionGroupRef = useRef<"A" | "B" | null>(null);
   const [isMentionOpen, setIsMentionOpen] = useState(false);
   const [mentionQuery, setMentionQuery] = useState("");
   const [activeMentionIndex, setActiveMentionIndex] = useState(0);
@@ -199,6 +211,20 @@ export default function ChatPage() {
 
   useLayoutEffect(() => {
     setHasMounted(true);
+    const prefetch = () => prefetchTranscriptChunk();
+    let idleId: number | null = null;
+    let delayTimer: ReturnType<typeof setTimeout> | null = null;
+    if (typeof window.requestIdleCallback === "function") {
+      idleId = window.requestIdleCallback(prefetch, { timeout: 1500 });
+    } else {
+      delayTimer = setTimeout(prefetch, 1500);
+    }
+    return () => {
+      if (delayTimer != null) clearTimeout(delayTimer);
+      if (idleId != null && typeof window.cancelIdleCallback === "function") {
+        window.cancelIdleCallback(idleId);
+      }
+    };
   }, []);
 
   useLayoutEffect(() => {
@@ -353,14 +379,19 @@ export default function ChatPage() {
     return opt?.label ?? "All";
   }, [selectedProgram, programOptions]);
   const textareaRef = useRef<HTMLTextAreaElement>(null);
-  const desktopTextareaRef = useRef<HTMLTextAreaElement>(null);
-  const mobileTextareaRef = useRef<HTMLTextAreaElement>(null);
   const turnstileRef = useRef<TurnstileWidgetHandle>(null);
 
-  const requestTurnstileMount = useCallback(() => {
+  const requestComposerWarmup = useCallback(() => {
+    prefetchTranscriptChunk();
+    void ensureCalendarMeta();
     if (!requiresTurnstile) return;
     setTurnstileMounted(true);
   }, [requiresTurnstile]);
+
+  const handleProgramDropdownOpenChange = useCallback((open: boolean) => {
+    if (open) void ensureCalendarMeta();
+    setDropdownOpen(open);
+  }, []);
 
   const handleTurnstileReady = useCallback(() => {
     if (!pendingExecuteRef.current) return;
@@ -370,6 +401,17 @@ export default function ChatPage() {
 
   const groupAOptions = useMemo(() => programOptions.filter(p => p.group === 'A'), [programOptions]);
   const groupBOptions = useMemo(() => programOptions.filter(p => p.group === 'B'), [programOptions]);
+  const calendarMetaStatus = useSyncExternalStore(
+    subscribeCalendarMetaStatus,
+    getCalendarMetaStatus,
+    () => "idle" as const
+  );
+  const programCataloguePending: "loading" | "unavailable" | null =
+    groupAOptions.length === 0
+      ? calendarMetaStatus === "error"
+        ? "unavailable"
+        : "loading"
+      : null;
   const groupBProgramForSessions = groupBOptions.some((p) => p.value === selectedProgram)
     ? selectedProgram
     : ("All" as ProgramValue);
@@ -505,6 +547,8 @@ export default function ChatPage() {
     const trimmed = text.trim();
     if (!trimmed || isLoading || waitForTurnstileConfig) return;
     if (trimmed.length > MAX_CHAT_MESSAGE_LENGTH) return;
+    prefetchTranscriptChunk();
+    void ensureCalendarMeta();
     const activeToken = (tokenOverride ?? turnstileToken).trim();
     if (requiresTurnstile && !activeToken) {
       pendingSendRef.current = trimmed;
@@ -1125,28 +1169,17 @@ export default function ChatPage() {
 
   useLayoutEffect(() => {
     if (!isEmptyChat) return;
-    const syncActiveEmptyTextarea = () => {
-      const isDesktop = window.matchMedia(DESKTOP_VIEWPORT_QUERY).matches;
-      textareaRef.current = isDesktop
-        ? desktopTextareaRef.current
-        : mobileTextareaRef.current;
-      if (isDesktop) {
-        desktopTextareaRef.current?.focus({ preventScroll: true });
-      }
-    };
-    syncActiveEmptyTextarea();
-    const mql = window.matchMedia(DESKTOP_VIEWPORT_QUERY);
-    mql.addEventListener("change", syncActiveEmptyTextarea);
-    return () => mql.removeEventListener("change", syncActiveEmptyTextarea);
+    if (window.matchMedia(DESKTOP_VIEWPORT_QUERY).matches) {
+      textareaRef.current?.focus({ preventScroll: true });
+    }
   }, [isEmptyChat]);
 
-  const chatInputPlaceholder = useMemo(() => {
-    if (!isEmptyChat) return "Write a message...";
-    if (isDesktopViewport) {
-      return "Ask about calendars or holidays. Select your programme, or type @ to mention one.";
-    }
-    return "How can I help you today?";
-  }, [isEmptyChat, isDesktopViewport]);
+  const chatInputPlaceholder = isEmptyChat
+    ? "How can I help you today?"
+    : "Write a message...";
+  const chatInputPlaceholderDesktop = isEmptyChat
+    ? "Ask about calendars or holidays. Select your programme, or type @ to mention one."
+    : undefined;
 
   const suggestionsDisabled =
     waitForTurnstileConfig ||
@@ -1155,6 +1188,7 @@ export default function ChatPage() {
   const composerFormProps = {
     input,
     placeholder: chatInputPlaceholder,
+    placeholderDesktop: chatInputPlaceholderDesktop,
     isLoading,
     waitForTurnstileConfig,
     requiresTurnstile,
@@ -1183,7 +1217,7 @@ export default function ChatPage() {
     onSubmit: handleSubmit,
     onMentionSelect: handleMentionSelect,
     onMentionOpenChange: setIsMentionOpen,
-    onDropdownOpenChange: setDropdownOpen,
+    onDropdownOpenChange: handleProgramDropdownOpenChange,
     onActiveSubmenuChange: setActiveSubmenu,
     onSessionToggle: handleSessionToggle,
     onProgramSelect: handleProgramSelect,
@@ -1194,20 +1228,17 @@ export default function ChatPage() {
     modelDropdownOpen,
     onModelDropdownOpenChange: setModelDropdownOpen,
     onModelSelect: handleModelSelect,
-    onTextareaFocus: requestTurnstileMount,
+    onTextareaFocus: requestComposerWarmup,
+    onProgramMenuWarm: () => {
+      void ensureCalendarMeta();
+    },
+    programCataloguePending,
   };
 
   const chatModelIds = useMemo(
     () => chatModels.map((model) => model.id),
     [chatModels]
   );
-
-  /**
-   * Mobile-first until mount to avoid dual-shell hydrate; then one viewport shell.
-   * Pre-mount the mobile shell stays hidden at `lg` so desktop never paints it.
-   */
-  const showDesktopEmpty = hasMounted && isDesktopViewport;
-  const showMobileEmpty = !hasMounted || !isDesktopViewport;
 
   return (
     <div className="relative flex h-dvh flex-col overflow-hidden bg-background text-foreground" data-nosnippet>
@@ -1236,47 +1267,23 @@ export default function ChatPage() {
       ) : null}
       <div className="flex min-h-0 min-w-0 flex-1 flex-col overflow-hidden px-1 md:px-0">
         {isEmptyChat ? (
-          showDesktopEmpty ? (
-            <ChatEmptyDesktop
-              showTurnstileChallenge={showTurnstileChallenge}
-              showTurnstileSlot={showTurnstileSlot}
-              turnstileSiteKey={turnstileSiteKey ?? ""}
-              turnstileNonce={turnstileNonce}
-              turnstileRef={turnstileRef}
-              onTurnstileToken={handleTurnstileToken}
-              onTurnstileReady={handleTurnstileReady}
-              suggestions={suggestions}
-              suggestionsDisabled={suggestionsDisabled}
-              suggestionsLoading={suggestionsLoading}
-              onSuggestionSelect={sendMessage}
-              composer={{
-                ...composerFormProps,
-                textareaRef: desktopTextareaRef,
-                placeholder:
-                  "Ask about calendars or holidays. Select your programme, or type @ to mention one.",
-              }}
-            />
-          ) : showMobileEmpty ? (
-            <ChatEmptyMobile
-              className={hasMounted ? undefined : "lg:invisible"}
-              showTurnstileChallenge={showTurnstileChallenge}
-              showTurnstileSlot={showTurnstileSlot}
-              turnstileSiteKey={turnstileSiteKey ?? ""}
-              turnstileNonce={turnstileNonce}
-              turnstileRef={turnstileRef}
-              onTurnstileToken={handleTurnstileToken}
-              onTurnstileReady={handleTurnstileReady}
-              suggestions={suggestions}
-              suggestionsDisabled={suggestionsDisabled}
-              suggestionsLoading={suggestionsLoading}
-              onSuggestionSelect={sendMessage}
-              composer={{
-                ...composerFormProps,
-                textareaRef: mobileTextareaRef,
-                placeholder: "How can I help you today?",
-              }}
-            />
-          ) : null
+          <ChatEmptyMobile
+            showTurnstileChallenge={showTurnstileChallenge}
+            showTurnstileSlot={showTurnstileSlot}
+            turnstileSiteKey={turnstileSiteKey ?? ""}
+            turnstileNonce={turnstileNonce}
+            turnstileRef={turnstileRef}
+            onTurnstileToken={handleTurnstileToken}
+            onTurnstileReady={handleTurnstileReady}
+            suggestions={suggestions}
+            suggestionsDisabled={suggestionsDisabled}
+            suggestionsLoading={suggestionsLoading}
+            onSuggestionSelect={sendMessage}
+            composer={{
+              ...composerFormProps,
+              textareaRef,
+            }}
+          />
         ) : (
           <>
             <ChatTranscript

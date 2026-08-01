@@ -28,7 +28,7 @@ interface ChatEmptyDesktopProps {
   suggestionsDisabled: boolean;
   suggestionsLoading?: boolean;
   onSuggestionSelect: (suggestion: string) => void;
-  composer: ChatComposerFormProps;
+  composer?: ChatComposerFormProps;
 }
 
 export function ChatEmptyDesktop({
@@ -69,7 +69,14 @@ export function ChatEmptyDesktop({
             </EmptyTitle>
           </EmptyHeader>
         </Empty>
-        <ChatComposerForm {...composer} composerSlot="desktop" className="px-0" />
+        {composer ? (
+          <ChatComposerForm {...composer} composerSlot="desktop" className="px-0" />
+        ) : (
+          <div
+            aria-hidden
+            className="h-24 w-full shrink-0 rounded-xl bg-secondary/50"
+          />
+        )}
         <SuggestionStack
           suggestions={suggestions}
           disabled={suggestionsDisabled}

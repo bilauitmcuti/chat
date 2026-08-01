@@ -1,7 +1,7 @@
 "use client";
 
 import type { ComponentProps } from "react";
-import { useEffect } from "react";
+import { useEffect, useMemo, useState } from "react";
 import { cn } from "@/lib/utils";
 
 export type ModelSelectorLogoProvider =
@@ -93,15 +93,48 @@ export function ModelSelectorLogo({
   );
 }
 
-/** Warm the browser cache so dropdown logos paint without a fetch delay. */
+/**
+ * Warm the browser cache so dropdown logos paint without a fetch delay.
+ * Warming runs at idle (off the first-paint path) or immediately when `warmNow`.
+ */
 export function ModelSelectorLogoPreload({
   providers,
+  warmNow = false,
 }: {
   providers: readonly string[];
+  warmNow?: boolean;
 }) {
-  const unique = [...new Set(providers.filter(Boolean))];
+  const providerKey = providers.filter(Boolean).join("|");
+  const unique = useMemo(
+    () => [...new Set(providerKey.split("|").filter(Boolean))],
+    [providerKey]
+  );
+  const [isWarm, setIsWarm] = useState(false);
 
   useEffect(() => {
+    if (isWarm) return;
+    if (warmNow) {
+      setIsWarm(true);
+      return;
+    }
+    const warm = () => setIsWarm(true);
+    if (typeof window.requestIdleCallback === "function") {
+      const id = window.requestIdleCallback(warm, { timeout: 2000 });
+      return () => window.cancelIdleCallback(id);
+    }
+    const timer = window.setTimeout(warm, 600);
+    return () => window.clearTimeout(timer);
+  }, [isWarm, warmNow]);
+
+  useEffect(() => {
+    if (!isWarm) return;
+    if (!document.querySelector('link[rel="preconnect"][href="https://models.dev"]')) {
+      const preconnect = document.createElement("link");
+      preconnect.rel = "preconnect";
+      preconnect.href = "https://models.dev";
+      preconnect.crossOrigin = "anonymous";
+      document.head.appendChild(preconnect);
+    }
     for (const provider of unique) {
       const href = getModelSelectorLogoUrl(provider);
       if (document.querySelector(`link[rel="preload"][href="${href}"]`)) continue;
@@ -112,9 +145,9 @@ export function ModelSelectorLogoPreload({
       link.type = "image/svg+xml";
       document.head.appendChild(link);
     }
-  }, [unique.join("|")]);
+  }, [isWarm, unique]);
 
-  if (unique.length === 0) return null;
+  if (!isWarm || unique.length === 0) return null;
 
   return (
     <div

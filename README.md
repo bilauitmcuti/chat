@@ -1,4 +1,4 @@
-![Chat - Bila UiTM Cuti](public/og/chat.png)
+Chat - Bila UiTM Cuti
 
 # Bila UiTM Cuti Chat
 
@@ -18,7 +18,7 @@ The product stays focused on calendar and UiTM orientation questions. It is not 
 
 Users can pick a Cloudflare Workers AI model in the chat composer. All picker models support **function calling** (tool use).
 
-![Models](public/og/models.png)
+Models
 
 The chat composer lets users pick from multiple Cloudflare Workers AI models, including Gemma 4 (default), Llama 4 Scout, Mistral Small 3.1, and Nemotron 3 Super. All available models support function calling, enabling the assistant to look up academic facts before answering.
 
@@ -26,15 +26,19 @@ Function calling lets the assistant look up the right academic facts before answ
 
 ## Features
 
-| Feature | Description |
-|---------|-------------|
-| Streaming chat | For academic calendar and UiTM general questions |
-| Tool-calling agent | Supports function calling across all model pickers |
-| Reasoning | Available for Gemma 4 and Nemotron 3 Super models |
-| Session/program scope picker | Ensures answers match the user’s campus group and semester |
-| Markdown replies | Supports tables, code, math, and diagrams where relevant |
-| Cloudflare Turnstile | Provides bot protection on chat |
-| Adaptive language | Shared language-control pipeline across every model (see below) |
+
+| Feature                      | Description                                                     |
+| ---------------------------- | --------------------------------------------------------------- |
+| Streaming chat               | For academic calendar and UiTM general questions                |
+| Tool-calling agent           | Supports function calling across all model pickers              |
+| Reasoning                    | Available for Gemma 4 and Nemotron 3 Super models               |
+| Session/program scope picker | Ensures answers match the user’s campus group and semester      |
+| Markdown replies             | Supports tables, code, math, and diagrams where relevant        |
+| Cloudflare Turnstile         | Provides bot protection on chat                                 |
+| Adaptive language            | Shared language-control pipeline across every model (see below) |
+
+
+
 
 ### Adaptive language (English / Malaysian Malay / mixed)
 
@@ -46,16 +50,22 @@ Replies follow the **same language behaviour on every picker model** (Gemma 4, L
 - **Conversation memory** — Short follow-ups (“Next”, “Okay”, “Lepas tu”) keep the thread’s language; a clear full-sentence switch (or “reply in English” / “jawab dalam BM”) updates the preference for that turn.
 - **Quiet quality check** — If a reply is clearly the wrong language, the server regenerates once before you see it. Detection is never explained in the chat UI.
 
+
+
 ## Tech stack
 
-| Area | Choice |
-|------|--------|
-| App | Next.js (App Router), React, TypeScript |
-| UI | Tailwind CSS, shadcn/ui, Base UI, ai-elements |
-| Runtime | Cloudflare Workers via `@opennextjs/cloudflare` |
-| Inference | Cloudflare Workers AI + AI Gateway |
-| Bot protection | Cloudflare Turnstile |
-| Tests | Vitest |
+
+| Area           | Choice                                          |
+| -------------- | ----------------------------------------------- |
+| App            | Next.js (App Router), React, TypeScript         |
+| UI             | Tailwind CSS, shadcn/ui, Base UI, ai-elements   |
+| Runtime        | Cloudflare Workers via `@opennextjs/cloudflare` |
+| Inference      | Cloudflare Workers AI + AI Gateway              |
+| Bot protection | Cloudflare Turnstile                            |
+| Tests          | Vitest                                          |
+
+
+
 
 ## How chat works (high level)
 
@@ -65,6 +75,8 @@ Replies follow the **same language behaviour on every picker model** (Gemma 4, L
 4. If the tool-calling agent is used, the model may access tools and generate a draft answer; models with reasoning skills can show their thought process in the UI.
 5. The reply is checked for accuracy—including language and calendar date correctness—before displaying to the user.
 6. Users can provide feedback with a thumbs up or down to help refine future responses.
+
+
 
 ## Related
 

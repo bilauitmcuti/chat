@@ -10,6 +10,8 @@ interface VersionResponse {
 
 /** Production only; longer interval to cut noise and server load. */
 const POLL_INTERVAL_MS = 60_000;
+/** Defer first version check so it stays off the critical navigation path. */
+const FIRST_CHECK_DELAY_MS = 12_000;
 
 /**
  * Quiet deploy notice: no countdown, no auto-reload (avoids tab-resume flicker).
@@ -26,6 +28,9 @@ export function VersionBanner() {
   useEffect(() => {
     if (process.env.NODE_ENV !== "production") return;
     if (!INITIAL_BUILD_ID) return;
+
+    let delayTimer: ReturnType<typeof setTimeout> | null = null;
+    let idleId: number | null = null;
 
     function clearPoll() {
       if (intervalRef.current != null) {
@@ -59,6 +64,23 @@ export function VersionBanner() {
       intervalRef.current = setInterval(checkVersion, POLL_INTERVAL_MS);
     }
 
+    function beginChecks() {
+      if (document.visibilityState !== "visible") return;
+      void checkVersion();
+      startPoll();
+    }
+
+    function scheduleFirstCheck() {
+      const run = () => {
+        beginChecks();
+      };
+      if (typeof window !== "undefined" && "requestIdleCallback" in window) {
+        idleId = window.requestIdleCallback(run, { timeout: FIRST_CHECK_DELAY_MS });
+      } else {
+        delayTimer = setTimeout(run, FIRST_CHECK_DELAY_MS);
+      }
+    }
+
     function onVisibilityChange() {
       if (document.visibilityState === "visible") {
         void checkVersion();
@@ -69,14 +91,15 @@ export function VersionBanner() {
     }
 
     document.addEventListener("visibilitychange", onVisibilityChange);
-    if (document.visibilityState === "visible") {
-      void checkVersion();
-      startPoll();
-    }
+    scheduleFirstCheck();
 
     return () => {
       document.removeEventListener("visibilitychange", onVisibilityChange);
       clearPoll();
+      if (delayTimer != null) clearTimeout(delayTimer);
+      if (idleId != null && typeof window !== "undefined" && "cancelIdleCallback" in window) {
+        window.cancelIdleCallback(idleId);
+      }
     };
   }, []);
 

@@ -125,9 +125,7 @@ export default function RootLayout({
           content="#1a1a1a"
           media="(prefers-color-scheme: dark)"
         />
-        {getTurnstileSiteKey() ? (
-          <link rel="preconnect" href="https://challenges.cloudflare.com" />
-        ) : null}
+        {/* Turnstile api.js loads only after composer focus/send — no eager preconnect. */}
         <meta name="application-name" content="Bila UiTM Cuti Chat" />
         <script
           type="application/ld+json"

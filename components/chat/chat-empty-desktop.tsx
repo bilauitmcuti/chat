@@ -23,6 +23,7 @@ interface ChatEmptyDesktopProps {
   turnstileNonce: number;
   turnstileRef: React.RefObject<TurnstileWidgetHandle | null>;
   onTurnstileToken: (token: string) => void;
+  onTurnstileReady?: () => void;
   suggestions: string[];
   suggestionsDisabled: boolean;
   suggestionsLoading?: boolean;
@@ -37,6 +38,7 @@ export function ChatEmptyDesktop({
   turnstileNonce,
   turnstileRef,
   onTurnstileToken,
+  onTurnstileReady,
   suggestions,
   suggestionsDisabled,
   suggestionsLoading = false,
@@ -44,11 +46,11 @@ export function ChatEmptyDesktop({
   composer,
 }: ChatEmptyDesktopProps) {
   return (
-    <div className="hidden min-h-0 min-w-0 flex-1 flex-col items-center justify-center overflow-hidden px-4 lg:flex">
+    <div className="flex min-h-0 min-w-0 flex-1 flex-col items-center justify-center overflow-hidden px-4">
       <div className="mx-auto flex w-full max-w-[600px] flex-col items-stretch">
         <Empty className="mb-6 flex-none border-none p-0">
           {showTurnstileSlot ? (
-            <div className="mx-auto mb-4 flex min-h-[65px] w-full max-w-[320px] items-start justify-center px-3">
+            <div className="mx-auto mb-4 flex w-full max-w-[320px] items-start justify-center px-3 empty:mb-0 empty:min-h-0">
               {showTurnstileChallenge ? (
                 <TurnstileWidget
                   ref={turnstileRef}
@@ -56,6 +58,7 @@ export function ChatEmptyDesktop({
                   siteKey={turnstileSiteKey}
                   action="chat_message"
                   onToken={onTurnstileToken}
+                  onReady={onTurnstileReady}
                 />
               ) : null}
             </div>

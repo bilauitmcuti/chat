@@ -1,6 +1,7 @@
 "use client";
 
 import { useState, useRef, useEffect, useLayoutEffect, useCallback, useMemo, useSyncExternalStore } from "react";
+import dynamic from "next/dynamic";
 import { usePathname } from "next/navigation";
 import { HugeiconsIcon } from "@hugeicons/react";
 import { ArrowLeft01Icon } from "@hugeicons/core-free-icons";
@@ -23,13 +24,18 @@ import {
 import { trackZarazEvent, ZARAZ_EVENTS } from "@/lib/zaraz";
 import { useTurnstileSiteKeyFromContext } from "@/hooks/use-turnstile-site-key";
 import type { TurnstileWidgetHandle } from "@/components/turnstile-widget";
-import { ChatTranscript } from "@/components/chat/chat-transcript";
 import { ChatEmptyDesktop } from "@/components/chat/chat-empty-desktop";
 import { ChatEmptyMobile } from "@/components/chat/chat-empty-mobile";
 import { ChatComposer } from "@/components/chat/chat-composer";
 import { ModelShortcut } from "@/components/model-shortcut";
 import { getRandomSuggestions } from "@/components/chat/suggestion-data";
 import { DESKTOP_VIEWPORT_QUERY, useDesktopViewport } from "@/lib/use-mobile-viewport";
+
+const ChatTranscript = dynamic(
+  () =>
+    import("@/components/chat/chat-transcript").then((mod) => mod.ChatTranscript),
+  { ssr: false }
+);
 import {
   CHAT_TURNSTILE_COOKIE,
   CHAT_TIMEOUT_MESSAGE,
@@ -110,6 +116,11 @@ export default function ChatPage() {
   const [turnstileNonce, setTurnstileNonce] = useState(0);
   const [isTurnstileSessionVerified, setIsTurnstileSessionVerified] = useState(false);
   const [hasMounted, setHasMounted] = useState(false);
+  /** Mount Turnstile (and load api.js) only after composer focus or first send. */
+  const [turnstileMounted, setTurnstileMounted] = useState(false);
+  /** Message waiting for Turnstile execute() callback (deferred challenge / PAT). */
+  const pendingSendRef = useRef<string | null>(null);
+  const pendingExecuteRef = useRef(false);
   const turnstileCookieVerified = useSyncExternalStore(
     () => () => {},
     () =>
@@ -175,13 +186,16 @@ export default function ChatPage() {
   const waitForTurnstileConfig =
     process.env.NODE_ENV === "production" && !isTurnstileConfigReady;
   /**
-   * Reserve slot height from first paint when a site key is known / config pending.
-   * Widget itself waits for mount so SSR + cookie hydrate do not flash the challenge.
+   * Turnstile UI only after user intent (focus/send) so api.js is off the critical path.
    */
   const showTurnstileSlot =
-    waitForTurnstileConfig || (Boolean(turnstileSiteKey) && !isTurnstileVerified);
+    turnstileMounted &&
+    (waitForTurnstileConfig || (Boolean(turnstileSiteKey) && !isTurnstileVerified));
   const showTurnstileChallenge =
-    hasMounted && requiresTurnstile && !turnstileToken.trim();
+    hasMounted &&
+    turnstileMounted &&
+    requiresTurnstile &&
+    !turnstileToken.trim();
 
   useLayoutEffect(() => {
     setHasMounted(true);
@@ -342,6 +356,18 @@ export default function ChatPage() {
   const desktopTextareaRef = useRef<HTMLTextAreaElement>(null);
   const mobileTextareaRef = useRef<HTMLTextAreaElement>(null);
   const turnstileRef = useRef<TurnstileWidgetHandle>(null);
+
+  const requestTurnstileMount = useCallback(() => {
+    if (!requiresTurnstile) return;
+    setTurnstileMounted(true);
+  }, [requiresTurnstile]);
+
+  const handleTurnstileReady = useCallback(() => {
+    if (!pendingExecuteRef.current) return;
+    pendingExecuteRef.current = false;
+    turnstileRef.current?.execute();
+  }, []);
+
   const groupAOptions = useMemo(() => programOptions.filter(p => p.group === 'A'), [programOptions]);
   const groupBOptions = useMemo(() => programOptions.filter(p => p.group === 'B'), [programOptions]);
   const groupBProgramForSessions = groupBOptions.some((p) => p.value === selectedProgram)
@@ -475,12 +501,19 @@ export default function ChatPage() {
     window.location.assign("https://bilauitmcuti.com/");
   }, []);
 
-  const sendMessage = useCallback(async (text: string) => {
+  const sendMessage = useCallback(async (text: string, tokenOverride?: string) => {
     const trimmed = text.trim();
     if (!trimmed || isLoading || waitForTurnstileConfig) return;
     if (trimmed.length > MAX_CHAT_MESSAGE_LENGTH) return;
-    if (requiresTurnstile && !turnstileToken.trim()) {
-      turnstileRef.current?.execute();
+    const activeToken = (tokenOverride ?? turnstileToken).trim();
+    if (requiresTurnstile && !activeToken) {
+      pendingSendRef.current = trimmed;
+      pendingExecuteRef.current = true;
+      if (turnstileMounted) {
+        turnstileRef.current?.execute();
+      } else {
+        setTurnstileMounted(true);
+      }
       return;
     }
 
@@ -540,7 +573,6 @@ export default function ChatPage() {
       didAttemptFetch = true;
       const history = prepareHistory(messages);
 
-      const trimmedToken = turnstileToken.trim();
       const body = JSON.stringify({
         message: trimmed,
         program: selectedProgram,
@@ -548,7 +580,7 @@ export default function ChatPage() {
         history,
         stream: true,
         model: modelIdForTurn,
-        turnstileToken: trimmedToken ? trimmedToken : undefined,
+        turnstileToken: activeToken ? activeToken : undefined,
       });
       let content: string | null = null;
       let maxAttempts = 3;
@@ -829,7 +861,7 @@ export default function ChatPage() {
         }
       }
 
-      if (didAttemptFetch && !chatRequestSucceeded && trimmedToken) {
+      if (didAttemptFetch && !chatRequestSucceeded && activeToken) {
         setTurnstileToken("");
         setTurnstileNonce((n) => n + 1);
       }
@@ -899,8 +931,20 @@ export default function ChatPage() {
     selectedModelId,
     startLoadingState,
     turnstileToken,
+    turnstileMounted,
     waitForTurnstileConfig,
   ]);
+
+  const handleTurnstileToken = useCallback(
+    (token: string) => {
+      setTurnstileToken(token);
+      const pending = pendingSendRef.current;
+      if (!token.trim() || !pending) return;
+      pendingSendRef.current = null;
+      void sendMessage(pending, token);
+    },
+    [sendMessage]
+  );
 
   const handleSubmit = async (e?: React.FormEvent) => {
     e?.preventDefault();
@@ -1106,7 +1150,6 @@ export default function ChatPage() {
 
   const suggestionsDisabled =
     waitForTurnstileConfig ||
-    (requiresTurnstile && !turnstileToken.trim()) ||
     isLoading;
 
   const composerFormProps = {
@@ -1151,12 +1194,20 @@ export default function ChatPage() {
     modelDropdownOpen,
     onModelDropdownOpenChange: setModelDropdownOpen,
     onModelSelect: handleModelSelect,
+    onTextareaFocus: requestTurnstileMount,
   };
 
   const chatModelIds = useMemo(
     () => chatModels.map((model) => model.id),
     [chatModels]
   );
+
+  /**
+   * Mobile-first until mount to avoid dual-shell hydrate; then one viewport shell.
+   * Pre-mount the mobile shell stays hidden at `lg` so desktop never paints it.
+   */
+  const showDesktopEmpty = hasMounted && isDesktopViewport;
+  const showMobileEmpty = !hasMounted || !isDesktopViewport;
 
   return (
     <div className="relative flex h-dvh flex-col overflow-hidden bg-background text-foreground" data-nosnippet>
@@ -1185,14 +1236,15 @@ export default function ChatPage() {
       ) : null}
       <div className="flex min-h-0 min-w-0 flex-1 flex-col overflow-hidden px-1 md:px-0">
         {isEmptyChat ? (
-          <>
+          showDesktopEmpty ? (
             <ChatEmptyDesktop
-              showTurnstileChallenge={showTurnstileChallenge && isDesktopViewport}
+              showTurnstileChallenge={showTurnstileChallenge}
               showTurnstileSlot={showTurnstileSlot}
               turnstileSiteKey={turnstileSiteKey ?? ""}
               turnstileNonce={turnstileNonce}
               turnstileRef={turnstileRef}
-              onTurnstileToken={setTurnstileToken}
+              onTurnstileToken={handleTurnstileToken}
+              onTurnstileReady={handleTurnstileReady}
               suggestions={suggestions}
               suggestionsDisabled={suggestionsDisabled}
               suggestionsLoading={suggestionsLoading}
@@ -1202,20 +1254,18 @@ export default function ChatPage() {
                 textareaRef: desktopTextareaRef,
                 placeholder:
                   "Ask about calendars or holidays. Select your programme, or type @ to mention one.",
-                // Only the visible shell owns open menus — portals from the hidden twin would duplicate.
-                dropdownOpen: isDesktopViewport ? dropdownOpen : false,
-                modelDropdownOpen: isDesktopViewport ? modelDropdownOpen : false,
-                activeSubmenu: isDesktopViewport ? activeSubmenu : null,
-                isMentionOpen: isDesktopViewport ? isMentionOpen : false,
               }}
             />
+          ) : showMobileEmpty ? (
             <ChatEmptyMobile
-              showTurnstileChallenge={showTurnstileChallenge && !isDesktopViewport}
+              className={hasMounted ? undefined : "lg:invisible"}
+              showTurnstileChallenge={showTurnstileChallenge}
               showTurnstileSlot={showTurnstileSlot}
               turnstileSiteKey={turnstileSiteKey ?? ""}
               turnstileNonce={turnstileNonce}
               turnstileRef={turnstileRef}
-              onTurnstileToken={setTurnstileToken}
+              onTurnstileToken={handleTurnstileToken}
+              onTurnstileReady={handleTurnstileReady}
               suggestions={suggestions}
               suggestionsDisabled={suggestionsDisabled}
               suggestionsLoading={suggestionsLoading}
@@ -1224,13 +1274,9 @@ export default function ChatPage() {
                 ...composerFormProps,
                 textareaRef: mobileTextareaRef,
                 placeholder: "How can I help you today?",
-                dropdownOpen: !isDesktopViewport ? dropdownOpen : false,
-                modelDropdownOpen: !isDesktopViewport ? modelDropdownOpen : false,
-                activeSubmenu: !isDesktopViewport ? activeSubmenu : null,
-                isMentionOpen: !isDesktopViewport ? isMentionOpen : false,
               }}
             />
-          </>
+          ) : null
         ) : (
           <>
             <ChatTranscript
@@ -1246,7 +1292,8 @@ export default function ChatPage() {
               turnstileSiteKey={turnstileSiteKey ?? ""}
               turnstileNonce={turnstileNonce}
               turnstileRef={turnstileRef}
-              onTurnstileToken={setTurnstileToken}
+              onTurnstileToken={handleTurnstileToken}
+              onTurnstileReady={handleTurnstileReady}
               onViewportScroll={handleViewportScroll}
               onCopy={handleCopy}
               onReaction={handleReaction}

@@ -31,6 +31,7 @@ interface ChatTranscriptProps {
   turnstileNonce: number;
   turnstileRef: React.RefObject<TurnstileWidgetHandle | null>;
   onTurnstileToken: (token: string) => void;
+  onTurnstileReady?: () => void;
   onViewportScroll: (event: React.UIEvent<HTMLDivElement>) => void;
   onCopy: (msgId: string, content: string) => void;
   onReaction: (msgId: string, type: "up" | "down") => void;
@@ -52,6 +53,7 @@ export function ChatTranscript({
   turnstileNonce,
   turnstileRef,
   onTurnstileToken,
+  onTurnstileReady,
   onViewportScroll,
   onCopy,
   onReaction,
@@ -103,6 +105,7 @@ export function ChatTranscript({
                 siteKey={turnstileSiteKey}
                 action="chat_message"
                 onToken={onTurnstileToken}
+                onReady={onTurnstileReady}
               />
             </div>
           </div>

@@ -17,7 +17,7 @@ npx wrangler login             # required for local Workers AI binding
   - **Default model:** Gemma 4 (`@cf/google/gemma-4-26b-a4b-it`) on all environments.
   - **Client model picker:** users can choose from 4 Workers AI models in the chat composer (Gemma 4, Llama 4 Scout, Mistral Small 3.1, Nemotron 3 Super). See [`lib/chat/models.ts`](lib/chat/models.ts).
   - Optional server default override: `WORKERS_AI_MODEL` (must be an allowlisted model id).
-- `NEXT_PUBLIC_TURNSTILE_SITE_KEY` + `TURNSTILE_SECRET_KEY` — required for Turnstile on chat in production. Set `NEXT_PUBLIC_TURNSTILE_SITE_KEY` in build env, or `TURNSTILE_SITE_KEY` at runtime (client loads via `GET /chat/api/turnstile/config`).
+- `NEXT_PUBLIC_TURNSTILE_SITE_KEY` + `TURNSTILE_SECRET_KEY` — required for Turnstile on chat in production. **Prefer `NEXT_PUBLIC_TURNSTILE_SITE_KEY` in Workers Builds (build variables)** so the site key is inlined at build time and the client skips `GET /chat/api/turnstile/config` (avoids blocking send on cold `/chat` loads). Fallback: `TURNSTILE_SITE_KEY` at runtime (client loads via `GET /chat/api/turnstile/config`).
 
 ## Optional Environment
 
@@ -120,7 +120,7 @@ Both scripts run `opennextjs-cloudflare build` and create `.open-next/`. [`open-
 
 `Could not find compiled Open Next config, did you run the build command?`
 
-Build variables (as needed): `NEXT_PUBLIC_TURNSTILE_SITE_KEY`, etc. under **Build variables and secrets**. Runtime secrets stay under **Variables & Secrets** / `wrangler secret`.
+Build variables (as needed): `NEXT_PUBLIC_TURNSTILE_SITE_KEY` (**required for fast Turnstile config** — inlines the site key), etc. under **Build variables and secrets**. Runtime secrets stay under **Variables & Secrets** / `wrangler secret`.
 
 After changing settings, **Retry** the failed build (or push a new commit).
 

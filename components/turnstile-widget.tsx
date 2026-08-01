@@ -10,7 +10,7 @@ import {
 
 /**
  * Cloudflare Turnstile explicit rendering for deterministic SPA behavior.
- * Managed/invisible mode is controlled by the Cloudflare widget setting.
+ * Challenge runs on execute() only — avoids PAT probes during page load.
  */
 declare global {
   interface Window {
@@ -32,6 +32,8 @@ export interface TurnstileWidgetProps {
   siteKey: string;
   action?: string;
   onToken: (token: string) => void;
+  /** Fired once after the widget has been rendered and can accept execute(). */
+  onReady?: () => void;
   className?: string;
   /** Visual theme for the managed widget. */
   theme?: "auto" | "light" | "dark";
@@ -39,13 +41,15 @@ export interface TurnstileWidgetProps {
   size?: "normal" | "flexible" | "compact";
 }
 
-const TURNSTILE_SCRIPT_SRC = "https://challenges.cloudflare.com/turnstile/v0/api.js?render=explicit";
+const TURNSTILE_SCRIPT_SRC =
+  "https://challenges.cloudflare.com/turnstile/v0/api.js?render=explicit";
 
 export const TurnstileWidget = forwardRef<TurnstileWidgetHandle, TurnstileWidgetProps>(
 function TurnstileWidget({
   siteKey,
   action,
   onToken,
+  onReady,
   className,
   theme = "auto",
   size = "flexible",
@@ -54,10 +58,15 @@ function TurnstileWidget({
   const containerRef = useRef<HTMLDivElement | null>(null);
   const widgetIdRef = useRef<number | null>(null);
   const onTokenRef = useRef(onToken);
+  const onReadyRef = useRef(onReady);
 
   useEffect(() => {
     onTokenRef.current = onToken;
   }, [onToken]);
+
+  useEffect(() => {
+    onReadyRef.current = onReady;
+  }, [onReady]);
 
   useImperativeHandle(ref, () => ({
     reset: () => {
@@ -103,10 +112,14 @@ function TurnstileWidget({
         action: action ?? undefined,
         theme,
         size,
+        // Defer challenge (and PAT probe) until turnstile.execute().
+        execution: "execute",
+        appearance: "interaction-only",
         callback: (token: string) => onTokenRef.current(token),
         "expired-callback": () => onTokenRef.current(""),
         "error-callback": () => onTokenRef.current(""),
       });
+      onReadyRef.current?.();
     };
 
     const poll = () => {
@@ -132,7 +145,7 @@ function TurnstileWidget({
   return (
     <div
       ref={containerRef}
-      className={`min-h-[65px] w-full ${className ?? ""}`.trim()}
+      className={`w-full ${className ?? ""}`.trim()}
     />
   );
 });

@@ -129,6 +129,8 @@ export interface ChatComposerFormProps {
   modelDropdownOpen: boolean;
   onModelDropdownOpenChange: (open: boolean) => void;
   onModelSelect: (modelId: string) => void;
+  /** Fired when the composer textarea receives focus (e.g. defer Turnstile mount). */
+  onTextareaFocus?: () => void;
   className?: string;
   formClassName?: string;
 }
@@ -141,8 +143,8 @@ export function ChatComposerForm({
   placeholder,
   isLoading,
   waitForTurnstileConfig,
-  requiresTurnstile,
-  turnstileToken,
+  requiresTurnstile: _requiresTurnstile,
+  turnstileToken: _turnstileToken,
   feedbackError = null,
   showDisclaimer = false,
   mentionHighlightParts,
@@ -178,6 +180,7 @@ export function ChatComposerForm({
   modelDropdownOpen,
   onModelDropdownOpenChange,
   onModelSelect,
+  onTextareaFocus,
   className,
   formClassName,
 }: ChatComposerFormProps) {
@@ -186,13 +189,13 @@ export function ChatComposerForm({
   const sendDisabled =
     !input.trim() ||
     isLoading ||
-    waitForTurnstileConfig ||
-    (requiresTurnstile && !turnstileToken.trim());
+    waitForTurnstileConfig;
 
   return (
     <div className={cn("mx-auto flex w-full min-w-0 max-w-[600px] flex-col px-2 md:px-0", className)}>
       <ModelSelectorLogoPreload
         providers={chatModels.map((model) => model.provider)}
+        warmNow={modelDropdownOpen}
       />
       {feedbackError ? (
         <p className="text-xs text-destructive mb-2 px-1" role="status">
@@ -239,6 +242,7 @@ export function ChatComposerForm({
                 onInputChange(e.currentTarget.value, e.currentTarget.selectionStart)
               }
               onKeyDown={onKeyDown}
+              onFocus={() => onTextareaFocus?.()}
               placeholder={placeholder}
               disabled={isLoading}
               rows={1}

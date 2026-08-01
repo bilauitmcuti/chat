@@ -49,7 +49,7 @@ export interface ReasoningStatusInput {
   needsList?: boolean;
   phaseHint?: ReasoningPhaseHint;
   toolName?: ChatToolName;
-  retryReason?: "dates" | "incomplete";
+  retryReason?: "dates" | "incomplete" | "language";
 }
 
 export interface ReasoningValidationResult {
@@ -459,7 +459,7 @@ export interface ReasoningParagraphInput {
   hasMatchedActivity: boolean;
   activityMatches?: MatchedActivity[];
   toolName?: ChatToolName;
-  retryReason?: "dates" | "incomplete";
+  retryReason?: "dates" | "incomplete" | "language";
   contextIntent?: CalendarContextIntent;
   needsList?: boolean;
 }
@@ -473,7 +473,7 @@ type RetryStatusFocus =
   | "matched_activity";
 
 const RETRY_STATUS_POOLS: Record<
-  "dates" | "incomplete",
+  "dates" | "incomplete" | "language",
   Record<RetryStatusFocus, Record<LangBucket, string[]>>
 > = {
   dates: {
@@ -526,6 +526,32 @@ const RETRY_STATUS_POOLS: Record<
     matched_activity: {
       en: ["Completing your answer…", "Finishing the response…"],
       malay: ["Menyiapkan jawapan anda…", "Melengkapkan respons…"],
+    },
+  },
+  language: {
+    academic_calendar: {
+      en: ["Matching your language…", "Adjusting the reply language…"],
+      malay: ["Menyelaraskan bahasa jawapan…", "Menyuaikan gaya bahasa…"],
+    },
+    lecture_weeks: {
+      en: ["Matching your language…", "Adjusting the reply language…"],
+      malay: ["Menyelaraskan bahasa jawapan…", "Menyuaikan gaya bahasa…"],
+    },
+    public_holiday: {
+      en: ["Matching your language…", "Adjusting the reply language…"],
+      malay: ["Menyelaraskan bahasa jawapan…", "Menyuaikan gaya bahasa…"],
+    },
+    uitm_general: {
+      en: ["Matching your language…", "Adjusting the reply language…"],
+      malay: ["Menyelaraskan bahasa jawapan…", "Menyuaikan gaya bahasa…"],
+    },
+    multi_session: {
+      en: ["Matching your language…", "Adjusting the reply language…"],
+      malay: ["Menyelaraskan bahasa jawapan…", "Menyuaikan gaya bahasa…"],
+    },
+    matched_activity: {
+      en: ["Matching your language…", "Adjusting the reply language…"],
+      malay: ["Menyelaraskan bahasa jawapan…", "Menyuaikan gaya bahasa…"],
     },
   },
 };

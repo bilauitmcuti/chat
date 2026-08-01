@@ -6,7 +6,12 @@ import {
   shouldStreamTokensToClient,
   type ChatMessage,
 } from "@/lib/ai";
-import { getLanguageTurnDirective } from "@/lib/chat-language";
+import {
+  applyLanguageToTurn,
+  buildLanguageRetryNudge,
+  verifyReplyLanguage,
+  type LanguageProfile,
+} from "@/lib/chat/language";
 import { normalizeAssistantTables } from "@/lib/format-ai-table";
 import {
   ensureSessionsInStore,
@@ -467,7 +472,7 @@ export async function POST(request: NextRequest) {
     const useAgentTools = executionMode === "agent";
 
     /** Status-only retry UX — no reasoning paragraphs or extra LLM calls. */
-    const emitStreamRetry = (retryReason: "dates" | "incomplete") => {
+    const emitStreamRetry = (retryReason: "dates" | "incomplete" | "language") => {
       if (!streamHooks) return;
       const statusMessage = buildRetryStatusLine({
         message: sanitizedMessage,
@@ -693,7 +698,26 @@ export async function POST(request: NextRequest) {
           maxOutputTokens,
           { hasMatchedActivity }
         );
-    const languageDirective = getLanguageTurnDirective(sanitizedMessage, sanitizedHistory);
+    // Language-control pipeline: profile + adapted history + trailing LANGUAGE LOCK
+    // (scoped user message). Do not dump a long language directive into system prompt.
+    const languageTurn = await applyLanguageToTurn({
+      message: sanitizedMessage,
+      history: sanitizedHistory,
+      modelId,
+      correlationId,
+    });
+    const languageProfile: LanguageProfile = languageTurn.profile;
+    const modelHistory = languageTurn.history;
+    const languageLockMessage = languageTurn.languageLockMessage;
+
+    logger.info("Chat language profile", {
+      correlationId,
+      replyLanguage: languageProfile.replyLanguage,
+      confidence: languageProfile.confidence,
+      stickyFromHistory: languageProfile.stickyFromHistory,
+      usedLlmClassify: languageProfile.usedLlmClassify,
+    });
+
     const understandingDirective =
       !isMinimalTurn &&
       !useResearchOnly &&
@@ -702,11 +726,10 @@ export async function POST(request: NextRequest) {
         : "";
 
     const completionSuffix = isMinimalTurn
-      ? getMinimalChitchatInstruction() + languageDirective
+      ? getMinimalChitchatInstruction()
       : getCompletionInstruction(isSimple, asksDetail, needsList, hasMatchedActivity) +
         understandingDirective +
-        publicHolidayDirective +
-        languageDirective;
+        publicHolidayDirective;
 
     const systemPromptWithCompletion =
       systemPrompt + prefetchDirective + completionSuffix;
@@ -792,6 +815,12 @@ export async function POST(request: NextRequest) {
 
     const streamTokensToClient = shouldStreamTokensToClient();
 
+    const modelCallOpts = {
+      modelId,
+      correlationId,
+      languageLockMessage,
+    };
+
     const runPromptRetry = async (
       promptSuffix: string,
       onToken: (token: string) => void | Promise<void>,
@@ -802,16 +831,19 @@ export async function POST(request: NextRequest) {
         return streamAiWithRetry(
           sanitizedMessage,
           prompt,
-          sanitizedHistory,
-          { ...budget, modelId: modelId, correlationId, onToken, emitTokensToClient: streamTokensToClient }
+          modelHistory,
+          {
+            ...budget,
+            ...modelCallOpts,
+            onToken,
+            emitTokensToClient: streamTokensToClient,
+          }
         );
       }
-      return askAiWithRetry(
-        sanitizedMessage,
-        prompt,
-        sanitizedHistory,
-        { ...budget, modelId: modelId, correlationId }
-      );
+      return askAiWithRetry(sanitizedMessage, prompt, modelHistory, {
+        ...budget,
+        ...modelCallOpts,
+      });
     };
 
     const runLegacyLlm = async (
@@ -823,16 +855,19 @@ export async function POST(request: NextRequest) {
         return streamAiWithRetry(
           sanitizedMessage,
           prompt,
-          sanitizedHistory,
-          { ...budget, modelId: modelId, correlationId, onToken, emitTokensToClient: streamTokensToClient }
+          modelHistory,
+          {
+            ...budget,
+            ...modelCallOpts,
+            onToken,
+            emitTokensToClient: streamTokensToClient,
+          }
         );
       }
-      return askAiWithRetry(
-        sanitizedMessage,
-        prompt,
-        sanitizedHistory,
-        { ...budget, modelId: modelId, correlationId }
-      );
+      return askAiWithRetry(sanitizedMessage, prompt, modelHistory, {
+        ...budget,
+        ...modelCallOpts,
+      });
     };
 
     const resolveAgentReplyWithFallback = async (
@@ -904,7 +939,7 @@ export async function POST(request: NextRequest) {
         if (useAgentTools) {
           const agentResult = await askAgentWithRetry({
             userMessage: sanitizedMessage,
-            history: sanitizedHistory,
+            history: modelHistory,
             ctx: agentTurnContext,
             modelId: modelId,
             mode: chatMode,
@@ -912,6 +947,7 @@ export async function POST(request: NextRequest) {
             maxTokens: modelBudget.maxTokens,
             temperature: modelBudget.temperature,
             extraSystemDirectives: systemPromptWithCompletion,
+            languageLockMessage,
             onToken,
             onReasoningToken: onProgress?.onReasoningToken,
             emitTokensToClient: streamTokensToClient,
@@ -935,11 +971,10 @@ export async function POST(request: NextRequest) {
           rawReply = await streamAiWithRetry(
             sanitizedMessage,
             systemPromptWithCompletion,
-            sanitizedHistory,
+            modelHistory,
             {
               ...modelBudget,
-              modelId: modelId,
-              correlationId,
+              ...modelCallOpts,
               onToken,
               onReasoningToken: onProgress?.onReasoningToken,
               emitTokensToClient: streamTokensToClient,
@@ -949,8 +984,8 @@ export async function POST(request: NextRequest) {
           rawReply = await askAiWithRetry(
             sanitizedMessage,
             systemPromptWithCompletion,
-            sanitizedHistory,
-            { ...modelBudget, modelId: modelId, correlationId }
+            modelHistory,
+            { ...modelBudget, ...modelCallOpts }
           );
         }
 
@@ -980,15 +1015,20 @@ export async function POST(request: NextRequest) {
             rawReply = await streamAiWithRetry(
               sanitizedMessage,
               systemPromptWithCompletion + DATE_VALIDATION_RETRY_NUDGE,
-              sanitizedHistory,
-              { ...modelBudget, modelId: modelId, correlationId, onToken, emitTokensToClient: streamTokensToClient }
+              modelHistory,
+              {
+                ...modelBudget,
+                ...modelCallOpts,
+                onToken,
+                emitTokensToClient: streamTokensToClient,
+              }
             );
           } else {
             rawReply = await askAiWithRetry(
               sanitizedMessage,
               systemPromptWithCompletion + DATE_VALIDATION_RETRY_NUDGE,
-              sanitizedHistory,
-              { ...modelBudget, modelId: modelId, correlationId }
+              modelHistory,
+              { ...modelBudget, ...modelCallOpts }
             );
           }
           rawReply = await ensureNonEmptyReply(rawReply, onToken);
@@ -998,7 +1038,8 @@ export async function POST(request: NextRequest) {
         }
       }
 
-      const cleanedFirst = normalizeAssistantTables(cleanAiReply(rawReply));
+      let cleanedFirst = normalizeAssistantTables(cleanAiReply(rawReply));
+      let retried: "incomplete" | "language" | undefined;
       const incomplete =
         Date.now() - turnStartMs < RETRY_BUDGET_SKIP_MS &&
         detectIncompleteReply(cleanedFirst, needsList || asksDetail);
@@ -1020,11 +1061,10 @@ export async function POST(request: NextRequest) {
             retryReply = await streamAiWithRetry(
               sanitizedMessage,
               systemPromptWithCompletion + REPLY_COMPLETION_RETRY_NUDGE,
-              sanitizedHistory,
+              modelHistory,
               {
                 ...bumpedBudget,
-                modelId: modelId,
-                correlationId,
+                ...modelCallOpts,
                 onToken,
                 emitTokensToClient: streamTokensToClient,
               }
@@ -1033,21 +1073,63 @@ export async function POST(request: NextRequest) {
             retryReply = await askAiWithRetry(
               sanitizedMessage,
               systemPromptWithCompletion + REPLY_COMPLETION_RETRY_NUDGE,
-              sanitizedHistory,
-              { ...bumpedBudget, modelId: modelId, correlationId }
+              modelHistory,
+              { ...bumpedBudget, ...modelCallOpts }
             );
           }
           retryReply = await ensureNonEmptyReply(retryReply, onToken);
           const cleanedRetry = normalizeAssistantTables(cleanAiReply(retryReply));
           if (cleanedRetry.length >= cleanedFirst.length) {
-            logger.info("Chat turn completed", {
+            cleanedFirst = cleanedRetry;
+            retried = "incomplete";
+          }
+        } catch (err) {
+          if (!isEmptyModelReplyError(err)) throw err;
+        }
+      }
+
+      const languageCheck = verifyReplyLanguage(cleanedFirst, languageProfile);
+      if (
+        !languageCheck.ok &&
+        Date.now() - turnStartMs < RETRY_BUDGET_SKIP_MS &&
+        cleanedFirst.trim()
+      ) {
+        await onProgress?.onRetry?.("language");
+        const languageNudge = buildLanguageRetryNudge(languageProfile, languageCheck);
+        try {
+          let langRetry: string;
+          if (useAgentTools) {
+            langRetry = await runPromptRetry(languageNudge, onToken);
+          } else if (wantStream) {
+            langRetry = await streamAiWithRetry(
+              sanitizedMessage,
+              systemPromptWithCompletion + languageNudge,
+              modelHistory,
+              {
+                ...modelBudget,
+                ...modelCallOpts,
+                onToken,
+                emitTokensToClient: streamTokensToClient,
+              }
+            );
+          } else {
+            langRetry = await askAiWithRetry(
+              sanitizedMessage,
+              systemPromptWithCompletion + languageNudge,
+              modelHistory,
+              { ...modelBudget, ...modelCallOpts }
+            );
+          }
+          langRetry = await ensureNonEmptyReply(langRetry, onToken);
+          const cleanedLang = normalizeAssistantTables(cleanAiReply(langRetry));
+          if (cleanedLang.trim()) {
+            cleanedFirst = cleanedLang;
+            retried = "language";
+            logger.info("Chat language retry applied", {
               correlationId,
-              executionMode,
-              toolsUsed: turnToolsUsed,
-              retried: "incomplete",
-              durationMs: Date.now() - turnStartMs,
+              reason: languageCheck.reason,
+              replyLanguage: languageProfile.replyLanguage,
             });
-            return cleanedRetry;
           }
         } catch (err) {
           if (!isEmptyModelReplyError(err)) throw err;
@@ -1058,6 +1140,7 @@ export async function POST(request: NextRequest) {
         correlationId,
         executionMode,
         toolsUsed: turnToolsUsed,
+        retried,
         durationMs: Date.now() - turnStartMs,
       });
       if (cleanedFirst.trim()) return cleanedFirst;
@@ -1073,7 +1156,12 @@ export async function POST(request: NextRequest) {
             streamHooks.onToken(token);
           }, {
             onRetry: (reason) => {
-              const retryReason = reason === "dates" ? "dates" : "incomplete";
+              const retryReason =
+                reason === "dates"
+                  ? "dates"
+                  : reason === "language"
+                    ? "language"
+                    : "incomplete";
               emitStreamRetry(retryReason);
             },
           })

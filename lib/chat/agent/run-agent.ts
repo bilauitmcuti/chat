@@ -41,6 +41,8 @@ export interface RunChatAgentOptions {
   maxTokens: number;
   temperature: number;
   extraSystemDirectives?: string;
+  /** Trailing LANGUAGE LOCK user message (language-control pipeline). */
+  languageLockMessage?: string;
   onToken?: (token: string) => void | Promise<void>;
   onReasoningToken?: (token: string) => void | Promise<void>;
   emitTokensToClient?: boolean;
@@ -90,6 +92,7 @@ export async function runChatAgent(options: RunChatAgentOptions): Promise<AgentR
     userMessage: options.userMessage,
     systemPrompt,
     history: options.history,
+    languageLockMessage: options.languageLockMessage,
     tools: workersTools,
     modelId: options.modelId,
     correlationId: options.correlationId,

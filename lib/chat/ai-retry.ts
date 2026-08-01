@@ -119,6 +119,7 @@ export async function askAiWithRetry(
     temperature: number;
     modelId?: string | null;
     correlationId?: string;
+    languageLockMessage?: string;
   }
 ): Promise<string> {
   let lastError: unknown = null;
@@ -147,6 +148,7 @@ export async function streamAiWithRetry(
     onToken: (token: string) => void | Promise<void>;
     onReasoningToken?: (token: string) => void | Promise<void>;
     emitTokensToClient?: boolean;
+    languageLockMessage?: string;
   }
 ): Promise<string> {
   let lastError: unknown = null;
@@ -161,6 +163,7 @@ export async function streamAiWithRetry(
         onToken: options.onToken,
         onReasoningToken: options.onReasoningToken,
         emitTokensToClient: options.emitTokensToClient,
+        languageLockMessage: options.languageLockMessage,
       });
     } catch (err) {
       lastError = err;

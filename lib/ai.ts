@@ -404,7 +404,8 @@ function buildMessages(
   prompt: string,
   systemPrompt: string | undefined,
   history: ChatMessage[] | undefined,
-  limits: ChatLimits
+  limits: ChatLimits,
+  languageLockMessage?: string
 ): { role: "system" | "user" | "assistant"; content: string }[] {
   const messages: { role: "system" | "user" | "assistant"; content: string }[] = [];
 
@@ -431,6 +432,15 @@ function buildMessages(
     role: "user",
     content: truncate(prompt, limits.maxUserPromptChars),
   });
+
+  // Trailing user LANGUAGE LOCK — high priority for this turn (Workers AI scoped prompts).
+  if (languageLockMessage?.trim()) {
+    messages.push({
+      role: "user",
+      content: truncate(languageLockMessage.trim(), limits.maxUserPromptChars),
+    });
+  }
+
   return messages;
 }
 
@@ -663,11 +673,19 @@ export async function askWorkersAi(
     temperature?: number;
     modelId?: string | null;
     correlationId?: string;
+    /** Trailing scoped user message — language lock for this turn. */
+    languageLockMessage?: string;
   }
 ): Promise<string> {
   const limits = getChatLimits();
   const modelChain = [resolveChatModel(options?.modelId)];
-  const messages = buildMessages(prompt, systemPrompt, history, limits);
+  const messages = buildMessages(
+    prompt,
+    systemPrompt,
+    history,
+    limits,
+    options?.languageLockMessage
+  );
   const max_tokens = options?.maxTokens ?? limits.maxOutputTokens;
   const temperature = options?.temperature ?? DEFAULT_TEMPERATURE;
 
@@ -896,6 +914,8 @@ export interface StreamWorkersAiOptions {
   onReasoningToken?: (token: string) => void | Promise<void>;
   /** When false, model still runs (and may stream internally) but onToken is not called until the end. */
   emitTokensToClient?: boolean;
+  /** Trailing scoped user message — language lock for this turn. */
+  languageLockMessage?: string;
 }
 
 /** Stream tokens from Workers AI; falls back to buffered completion if streaming unsupported. */
@@ -907,7 +927,13 @@ export async function streamWorkersAi(
 ): Promise<string> {
   const limits = getChatLimits();
   const modelChain = [resolveChatModel(options.modelId)];
-  const messages = buildMessages(prompt, systemPrompt, history, limits);
+  const messages = buildMessages(
+    prompt,
+    systemPrompt,
+    history,
+    limits,
+    options.languageLockMessage
+  );
   const max_tokens = options.maxTokens ?? limits.maxOutputTokens;
   const temperature = options.temperature ?? DEFAULT_TEMPERATURE;
   const emitTokens = options.emitTokensToClient ?? shouldStreamTokensToClient();
@@ -1311,6 +1337,8 @@ export interface RunWorkersAiAgentParams {
   systemPrompt: string;
   history?: ChatMessage[];
   preloadMessages?: AgentChatMessage[];
+  /** Trailing scoped user message after the user turn (language lock). */
+  languageLockMessage?: string;
   tools: FlatToolDefinition[];
   modelId?: string | null;
   correlationId?: string;
@@ -1380,6 +1408,13 @@ export async function runWorkersAiAgent(params: RunWorkersAiAgentParams): Promis
     role: "user",
     content: truncate(params.userMessage, limits.maxUserPromptChars),
   });
+
+  if (params.languageLockMessage?.trim()) {
+    workingMessages.push({
+      role: "user",
+      content: truncate(params.languageLockMessage.trim(), limits.maxUserPromptChars),
+    });
+  }
 
   let lastAssistantContent: string | null = null;
   for (let step = 0; step < params.maxToolSteps; step++) {

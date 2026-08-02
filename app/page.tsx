@@ -1,7 +1,6 @@
 "use client";
 
 import { useState, useRef, useEffect, useLayoutEffect, useCallback, useMemo, useSyncExternalStore } from "react";
-import dynamic from "next/dynamic";
 import { usePathname } from "next/navigation";
 import { HugeiconsIcon } from "@hugeicons/react";
 import { ArrowLeft01Icon } from "@hugeicons/core-free-icons";
@@ -26,6 +25,7 @@ import { useTurnstileSiteKeyFromContext } from "@/hooks/use-turnstile-site-key";
 import type { TurnstileWidgetHandle } from "@/components/turnstile-widget";
 import { ChatEmptyMobile } from "@/components/chat/chat-empty-mobile";
 import { ChatComposer } from "@/components/chat/chat-composer";
+import { ChatTranscript } from "@/components/chat/chat-transcript";
 import { ModelShortcut } from "@/components/model-shortcut";
 import { getRandomSuggestions } from "@/components/chat/suggestion-data";
 import { DESKTOP_VIEWPORT_QUERY } from "@/lib/use-mobile-viewport";
@@ -35,22 +35,6 @@ import {
   subscribeCalendarMetaStatus,
 } from "@/lib/calendar-meta";
 
-let transcriptPrefetched = false;
-
-function prefetchTranscriptChunk(): void {
-  if (transcriptPrefetched) return;
-  transcriptPrefetched = true;
-  void import("@/components/chat/chat-transcript");
-}
-
-const ChatTranscript = dynamic(
-  () =>
-    import("@/components/chat/chat-transcript").then((mod) => mod.ChatTranscript),
-  {
-    ssr: false,
-    loading: () => <div aria-hidden className="min-h-0 flex-1" />,
-  }
-);
 import {
   CHAT_TURNSTILE_COOKIE,
   CHAT_TIMEOUT_MESSAGE,
@@ -219,8 +203,6 @@ export default function ChatPage() {
 
   useLayoutEffect(() => {
     setHasMounted(true);
-    // Prefetch transcript chunk on hydrate so empty→messages swap is ready.
-    prefetchTranscriptChunk();
   }, []);
 
   useLayoutEffect(() => {
@@ -378,7 +360,6 @@ export default function ChatPage() {
   const turnstileRef = useRef<TurnstileWidgetHandle>(null);
 
   const requestComposerWarmup = useCallback(() => {
-    prefetchTranscriptChunk();
     void ensureCalendarMeta();
     if (!requiresTurnstile) return;
     setTurnstileMounted(true);
@@ -963,7 +944,6 @@ export default function ChatPage() {
       const trimmed = text.trim();
       if (!trimmed || isLoading || waitForTurnstileConfig) return;
       if (trimmed.length > MAX_CHAT_MESSAGE_LENGTH) return;
-      prefetchTranscriptChunk();
       void ensureCalendarMeta();
 
       // Snapshot for this turn — picker changes during streaming apply to the next send only.
@@ -1246,7 +1226,6 @@ export default function ChatPage() {
   // Warm Turnstile (api.js + render) on empty chat so first send usually only execute()s.
   useEffect(() => {
     if (!hasMounted || !isEmptyChat || !requiresTurnstile) return;
-    prefetchTranscriptChunk();
     setTurnstileMounted(true);
   }, [hasMounted, isEmptyChat, requiresTurnstile]);
 

@@ -72,6 +72,7 @@ import {
   type ChatStreamingDraft,
   type MentionMatch,
 } from "@/components/chat/chat-utils";
+import { CHAT_VERIFICATION_REQUIRED_MESSAGE } from "@/lib/chat/user-messages";
 import { captureThinkingMetadata } from "@/lib/chat/reasoning-gate";
 import {
   DEFAULT_CHAT_MODEL,
@@ -91,6 +92,13 @@ import {
   type ProgramSessionMap,
 } from "@/lib/chat/session-state";
 type Message = ChatMessageItem;
+
+interface PendingSend {
+  text: string;
+  assistantId: string;
+  modelId: string;
+  historyMessages: Message[];
+}
 
 function withThinkingMetadata(message: Message, now = Date.now()): Message {
   const meta = captureThinkingMetadata(message.timestamp, {
@@ -132,8 +140,8 @@ export default function ChatPage() {
   const [hasMounted, setHasMounted] = useState(false);
   /** Mount Turnstile (and load api.js) only after composer focus or first send. */
   const [turnstileMounted, setTurnstileMounted] = useState(false);
-  /** Message waiting for Turnstile execute() callback (deferred challenge / PAT). */
-  const pendingSendRef = useRef<string | null>(null);
+  /** Optimistic send waiting for Turnstile execute() callback (deferred challenge / PAT). */
+  const pendingSendRef = useRef<PendingSend | null>(null);
   const pendingExecuteRef = useRef(false);
   const turnstileCookieVerified = useSyncExternalStore(
     () => () => {},
@@ -211,20 +219,8 @@ export default function ChatPage() {
 
   useLayoutEffect(() => {
     setHasMounted(true);
-    const prefetch = () => prefetchTranscriptChunk();
-    let idleId: number | null = null;
-    let delayTimer: ReturnType<typeof setTimeout> | null = null;
-    if (typeof window.requestIdleCallback === "function") {
-      idleId = window.requestIdleCallback(prefetch, { timeout: 1500 });
-    } else {
-      delayTimer = setTimeout(prefetch, 1500);
-    }
-    return () => {
-      if (delayTimer != null) clearTimeout(delayTimer);
-      if (idleId != null && typeof window.cancelIdleCallback === "function") {
-        window.cancelIdleCallback(idleId);
-      }
-    };
+    // Prefetch transcript chunk on hydrate so empty→messages swap is ready.
+    prefetchTranscriptChunk();
   }, []);
 
   useLayoutEffect(() => {
@@ -543,61 +539,50 @@ export default function ChatPage() {
     window.location.assign("https://bilauitmcuti.com/");
   }, []);
 
-  const sendMessage = useCallback(async (text: string, tokenOverride?: string) => {
-    const trimmed = text.trim();
-    if (!trimmed || isLoading || waitForTurnstileConfig) return;
-    if (trimmed.length > MAX_CHAT_MESSAGE_LENGTH) return;
-    prefetchTranscriptChunk();
-    void ensureCalendarMeta();
-    const activeToken = (tokenOverride ?? turnstileToken).trim();
-    if (requiresTurnstile && !activeToken) {
-      pendingSendRef.current = trimmed;
-      pendingExecuteRef.current = true;
-      if (turnstileMounted) {
-        turnstileRef.current?.execute();
-      } else {
-        setTurnstileMounted(true);
-      }
-      return;
-    }
+  const failPendingTurnstile = useCallback(() => {
+    const pending = pendingSendRef.current;
+    if (!pending) return;
+    pendingSendRef.current = null;
+    pendingExecuteRef.current = false;
+    const errorNow = Date.now();
+    setStreamingDraft(null);
+    setMessages((prev) =>
+      prev.map((m) =>
+        m.id === pending.assistantId
+          ? {
+              ...m,
+              content: CHAT_VERIFICATION_REQUIRED_MESSAGE,
+              timestamp: errorNow,
+              isComplete: true,
+              lifecycle: ASSISTANT_LIFECYCLE.ERROR,
+              streamPhase: undefined,
+              statusMessage: undefined,
+            }
+          : m
+      )
+    );
+    setIsLoading(false);
+    setTurnstileToken("");
+    setTurnstileNonce((n) => n + 1);
+  }, []);
 
-    // Snapshot for this turn — picker changes during streaming apply to the next send only.
-    const modelIdForTurn = selectedModelId;
+  const executeChatRequest = useCallback(
+    async (
+      trimmed: string,
+      assistantId: string,
+      modelIdForTurn: string,
+      activeToken: string,
+      historyMessages: Message[]
+    ) => {
+      let didAttemptFetch = false;
 
-    const now = Date.now();
-    const assistantId = (now + 1).toString();
-    const userMessage: Message = {
-      id: now.toString(),
-      role: "user",
-      content: trimmed,
-      timestamp: now,
-    };
-
-    const assistantPlaceholder: Message = {
-      id: assistantId,
-      role: "assistant",
-      content: "",
-      isComplete: false,
-      timestamp: now,
-      userPrompt: trimmed,
-      reasoningUiSupported: supportsReasoningUi(modelIdForTurn),
-      lifecycle: ASSISTANT_LIFECYCLE.SUBMITTED,
-    };
-
-    setMessages([...messages, userMessage, assistantPlaceholder]);
-    setStreamingDraft({ id: assistantId, content: "" });
-    setInput("");
-    setIsLoading(true);
-    startLoadingState();
-    let didAttemptFetch = false;
-
-    try {
-      if (typeof navigator !== "undefined" && !navigator.onLine) {
-        const offlineNow = Date.now();
-        setStreamingDraft(null);
-        setMessages((prev) =>
-          prev.map((m) =>
-            m.id === assistantId
+      try {
+        if (typeof navigator !== "undefined" && !navigator.onLine) {
+          const offlineNow = Date.now();
+          setStreamingDraft(null);
+          setMessages((prev) =>
+            prev.map((m) =>
+              m.id === assistantId
                 ? {
                     ...m,
                     content:
@@ -608,50 +593,226 @@ export default function ChatPage() {
                     streamPhase: undefined,
                     statusMessage: undefined,
                   }
-              : m
-          )
-        );
-        return;
-      }
+                : m
+            )
+          );
+          return;
+        }
 
-      didAttemptFetch = true;
-      const history = prepareHistory(messages);
+        didAttemptFetch = true;
+        const history = prepareHistory(historyMessages);
 
-      const body = JSON.stringify({
-        message: trimmed,
-        program: selectedProgram,
-        selectedSessions,
-        history,
-        stream: true,
-        model: modelIdForTurn,
-        turnstileToken: activeToken ? activeToken : undefined,
-      });
-      let content: string | null = null;
-      let maxAttempts = 3;
-      let chatRequestSucceeded = false;
-      let lastErrorStatus: number | undefined;
-      const isRetryableStatus = (s: number) =>
-        s === 429 || s === 500 || s === 502 || s === 503 || s === 504;
+        const body = JSON.stringify({
+          message: trimmed,
+          program: selectedProgram,
+          selectedSessions,
+          history,
+          stream: true,
+          model: modelIdForTurn,
+          turnstileToken: activeToken ? activeToken : undefined,
+        });
+        let content: string | null = null;
+        let maxAttempts = 3;
+        let chatRequestSucceeded = false;
+        let lastErrorStatus: number | undefined;
+        const isRetryableStatus = (s: number) =>
+          s === 429 || s === 500 || s === 502 || s === 503 || s === 504;
 
-      for (let attempt = 0; attempt < maxAttempts; attempt++) {
-        const controller = new AbortController();
-        let timeoutId = setTimeout(() => controller.abort(), FETCH_HEADERS_TIMEOUT_MS);
-        try {
-          const res = await fetch("/chat/api", {
-            method: "POST",
-            headers: { "Content-Type": "application/json" },
-            body,
-            signal: controller.signal,
-            credentials: "include",
-          });
+        for (let attempt = 0; attempt < maxAttempts; attempt++) {
+          const controller = new AbortController();
+          let timeoutId = setTimeout(() => controller.abort(), FETCH_HEADERS_TIMEOUT_MS);
+          try {
+            const res = await fetch("/chat/api", {
+              method: "POST",
+              headers: { "Content-Type": "application/json" },
+              body,
+              signal: controller.signal,
+              credentials: "include",
+            });
 
-          const responseType = res.headers.get("content-type") ?? "";
+            const responseType = res.headers.get("content-type") ?? "";
 
-          if (responseType.includes("text/event-stream")) {
-            if (!res.ok) {
+            if (responseType.includes("text/event-stream")) {
+              if (!res.ok) {
+                clearTimeout(timeoutId);
+                content = getChatErrorMessage(res, "Something went wrong. Please try again.");
+                if (isRetryableStatus(res.status) && attempt < maxAttempts - 1) {
+                  await new Promise((r) =>
+                    setTimeout(
+                      r,
+                      RETRY_DELAYS_MS[Math.min(attempt, RETRY_DELAYS_MS.length - 1)]
+                    )
+                  );
+                  continue;
+                }
+                break;
+              }
+
               clearTimeout(timeoutId);
-              content = getChatErrorMessage(res, "Something went wrong. Please try again.");
-              if (isRetryableStatus(res.status) && attempt < maxAttempts - 1) {
+              timeoutId = setTimeout(() => controller.abort(), FETCH_STREAM_TIMEOUT_MS);
+
+              let answerStarted = false;
+              let liveDraft: ChatStreamingDraft = {
+                id: assistantId,
+                content: "",
+              };
+              const syncDraft = (next: ChatStreamingDraft) => {
+                liveDraft = next;
+                setStreamingDraft(next);
+              };
+              const streamPainter = createRafMarkdownStreamPainter(
+                (chunk) => {
+                  syncDraft({
+                    ...liveDraft,
+                    content: liveDraft.content + chunk,
+                  });
+                },
+                { maxChunkChars: 8, firstFlushChars: 2 }
+              );
+              await consumeChatStream(
+                res,
+                {
+                  onReasoning: () => {
+                    /* Thinking-only UX — ignore server reasoning paragraphs. */
+                  },
+                  onToken: (token) => {
+                    if (!answerStarted && token.trim()) {
+                      answerStarted = true;
+                      setMessages((prev) =>
+                        prev.map((m) =>
+                          m.id === assistantId
+                            ? withThinkingMetadata({
+                                ...m,
+                                lifecycle: ASSISTANT_LIFECYCLE.STREAMING,
+                                streamPhase: undefined,
+                                statusMessage: undefined,
+                              })
+                            : m
+                        )
+                      );
+                    }
+                    streamPainter.push(token);
+                  },
+                  onStatus: (payload) => {
+                    if (!payload.phase || !payload.message?.trim()) return;
+                    setMessages((prev) =>
+                      prev.map((m) =>
+                        m.id === assistantId
+                          ? {
+                              ...m,
+                              lifecycle:
+                                payload.phase === CHAT_STREAM_PHASE.RETRY
+                                  ? ASSISTANT_LIFECYCLE.SUBMITTED
+                                  : ASSISTANT_LIFECYCLE.TOOL_CALL,
+                              streamPhase: payload.phase,
+                              statusMessage: payload.message,
+                            }
+                          : m
+                      )
+                    );
+                  },
+                  onReset: (payload) => {
+                    streamPainter.reset();
+                    answerStarted = false;
+                    syncDraft({ id: assistantId, content: "" });
+                    setMessages((prev) =>
+                      prev.map((m) =>
+                        m.id === assistantId
+                          ? {
+                              ...m,
+                              content: "",
+                              reasoning: undefined,
+                              lifecycle: ASSISTANT_LIFECYCLE.SUBMITTED,
+                              streamPhase: payload.phase ?? CHAT_STREAM_PHASE.RETRY,
+                              statusMessage: payload.message,
+                            }
+                          : m
+                      )
+                    );
+                  },
+                  onDone: (payload) => {
+                    streamPainter.flush();
+                    content = payload.reply;
+                    chatRequestSucceeded = true;
+                    const doneAt = Date.now();
+                    const replyText = payload.reply ?? "";
+
+                    setStreamingDraft(null);
+                    setMessages((prev) => {
+                      const hasMsg = prev.some((m) => m.id === assistantId);
+                      if (!hasMsg) {
+                        return [
+                          ...prev,
+                          {
+                            id: assistantId,
+                            role: "assistant",
+                            content: replyText,
+                            correlationId: payload.correlationId,
+                            userPrompt: trimmed,
+                            isComplete: true,
+                            timestamp: doneAt,
+                            lifecycle: ASSISTANT_LIFECYCLE.COMPLETE,
+                          },
+                        ];
+                      }
+                      return prev.map((m) => {
+                        if (m.id !== assistantId) return m;
+                        return withThinkingMetadata(
+                          {
+                            ...m,
+                            content: replyText,
+                            reasoning: undefined,
+                            correlationId: payload.correlationId,
+                            userPrompt: trimmed,
+                            isComplete: true,
+                            timestamp: m.timestamp ?? doneAt,
+                            lifecycle: ASSISTANT_LIFECYCLE.COMPLETE,
+                            streamPhase: undefined,
+                            statusMessage: undefined,
+                          },
+                          doneAt
+                        );
+                      });
+                    });
+                    setIsTurnstileSessionVerified(true);
+                    setTurnstileToken("");
+                    turnstileRef.current?.reset();
+                  },
+                  onError: (payload) => {
+                    streamPainter.flush();
+                    content = resolveChatErrorMessage(payload.status, payload.error);
+                    lastErrorStatus = payload.status;
+                    if (payload.status === 503 && maxAttempts === 3) {
+                      maxAttempts = 4;
+                    }
+                  },
+                },
+                { signal: controller.signal }
+              );
+              clearTimeout(timeoutId);
+
+              if (chatRequestSucceeded) break;
+
+              if (
+                lastErrorStatus &&
+                isRetryableStatus(lastErrorStatus) &&
+                attempt < maxAttempts - 1
+              ) {
+                setStreamingDraft({ id: assistantId, content: "" });
+                setMessages((prev) =>
+                  prev.map((m) =>
+                    m.id === assistantId
+                      ? {
+                          ...m,
+                          content: "",
+                          isComplete: false,
+                          lifecycle: ASSISTANT_LIFECYCLE.SUBMITTED,
+                          streamPhase: undefined,
+                          statusMessage: undefined,
+                        }
+                      : m
+                  )
+                );
                 await new Promise((r) =>
                   setTimeout(
                     r,
@@ -664,330 +825,238 @@ export default function ChatPage() {
             }
 
             clearTimeout(timeoutId);
-            timeoutId = setTimeout(() => controller.abort(), FETCH_STREAM_TIMEOUT_MS);
 
-            let answerStarted = false;
-            let liveDraft: ChatStreamingDraft = {
-              id: assistantId,
-              content: "",
-            };
-            const syncDraft = (next: ChatStreamingDraft) => {
-              liveDraft = next;
-              setStreamingDraft(next);
-            };
-            const streamPainter = createRafMarkdownStreamPainter(
-              (chunk) => {
-                syncDraft({
-                  ...liveDraft,
-                  content: liveDraft.content + chunk,
-                });
-              },
-              { maxChunkChars: 8, firstFlushChars: 2 }
-            );
-            await consumeChatStream(
-              res,
-              {
-                onReasoning: () => {
-                  /* Thinking-only UX — ignore server reasoning paragraphs. */
-                },
-                onToken: (token) => {
-                  if (!answerStarted && token.trim()) {
-                    answerStarted = true;
-                    setMessages((prev) =>
-                      prev.map((m) =>
-                        m.id === assistantId
-                          ? withThinkingMetadata({
-                              ...m,
-                              lifecycle: ASSISTANT_LIFECYCLE.STREAMING,
-                              streamPhase: undefined,
-                              statusMessage: undefined,
-                            })
-                          : m
-                      )
-                    );
-                  }
-                  streamPainter.push(token);
-                },
-                onStatus: (payload) => {
-                  if (!payload.phase || !payload.message?.trim()) return;
-                  setMessages((prev) =>
-                    prev.map((m) =>
-                      m.id === assistantId
-                        ? {
-                            ...m,
-                            lifecycle:
-                              payload.phase === CHAT_STREAM_PHASE.RETRY
-                                ? ASSISTANT_LIFECYCLE.SUBMITTED
-                                : ASSISTANT_LIFECYCLE.TOOL_CALL,
-                            streamPhase: payload.phase,
-                            statusMessage: payload.message,
-                          }
-                        : m
-                    )
-                  );
-                },
-                onReset: (payload) => {
-                  streamPainter.reset();
-                  answerStarted = false;
-                  syncDraft({ id: assistantId, content: "" });
-                  setMessages((prev) =>
-                    prev.map((m) =>
-                      m.id === assistantId
-                        ? {
-                            ...m,
-                            content: "",
-                            reasoning: undefined,
-                            lifecycle: ASSISTANT_LIFECYCLE.SUBMITTED,
-                            streamPhase: payload.phase ?? CHAT_STREAM_PHASE.RETRY,
-                            statusMessage: payload.message,
-                          }
-                        : m
-                    )
-                  );
-                },
-                onDone: (payload) => {
-                  streamPainter.flush();
-                  content = payload.reply;
-                  chatRequestSucceeded = true;
-                  const doneAt = Date.now();
-                  const replyText = payload.reply ?? "";
+            const data = await parseChatResponse(res);
 
-                  setStreamingDraft(null);
-                  setMessages((prev) => {
-                    const hasMsg = prev.some((m) => m.id === assistantId);
-                    if (!hasMsg) {
-                      return [
-                        ...prev,
-                        {
-                          id: assistantId,
-                          role: "assistant",
-                          content: replyText,
-                          correlationId: payload.correlationId,
-                          userPrompt: trimmed,
-                          isComplete: true,
-                          timestamp: doneAt,
-                          lifecycle: ASSISTANT_LIFECYCLE.COMPLETE,
-                        },
-                      ];
-                    }
-                    return prev.map((m) => {
-                      if (m.id !== assistantId) return m;
-                      return withThinkingMetadata(
-                        {
-                          ...m,
-                          content: replyText,
-                          reasoning: undefined,
-                          correlationId: payload.correlationId,
-                          userPrompt: trimmed,
-                          isComplete: true,
-                          timestamp: m.timestamp ?? doneAt,
-                          lifecycle: ASSISTANT_LIFECYCLE.COMPLETE,
-                          streamPhase: undefined,
-                          statusMessage: undefined,
-                        },
-                        doneAt
-                      );
-                    });
-                  });
-                  setIsTurnstileSessionVerified(true);
-                  setTurnstileToken("");
-                  turnstileRef.current?.reset();
-                },
-                onError: (payload) => {
-                  streamPainter.flush();
-                  content = resolveChatErrorMessage(payload.status, payload.error);
-                  lastErrorStatus = payload.status;
-                  if (payload.status === 503 && maxAttempts === 3) {
-                    maxAttempts = 4;
-                  }
-                },
-              },
-              { signal: controller.signal }
-            );
-            clearTimeout(timeoutId);
-
-            if (chatRequestSucceeded) break;
-
-            if (
-              lastErrorStatus &&
-              isRetryableStatus(lastErrorStatus) &&
-              attempt < maxAttempts - 1
-            ) {
-              setStreamingDraft({ id: assistantId, content: "" });
+            if (!res.ok) {
+              content = data.error || getChatErrorMessage(res, "Something went wrong. Please try again.");
+              if (res.status === 503 && maxAttempts === 3) {
+                maxAttempts = 4;
+              }
+              if (isRetryableStatus(res.status) && attempt < maxAttempts - 1) {
+                await new Promise((r) =>
+                  setTimeout(
+                    r,
+                    RETRY_DELAYS_MS[Math.min(attempt, RETRY_DELAYS_MS.length - 1)]
+                  )
+                );
+                continue;
+              }
+            } else {
+              const replyText = data.reply || "Sorry, I could not get a response.";
+              content = replyText;
+              chatRequestSucceeded = true;
+              const doneAt = Date.now();
+              setStreamingDraft(null);
               setMessages((prev) =>
                 prev.map((m) =>
                   m.id === assistantId
                     ? {
                         ...m,
-                        content: "",
-                        isComplete: false,
-                        lifecycle: ASSISTANT_LIFECYCLE.SUBMITTED,
+                        content: replyText,
+                        correlationId: data.correlationId,
+                        userPrompt: trimmed,
+                        isComplete: true,
+                        timestamp: doneAt,
+                        lifecycle: ASSISTANT_LIFECYCLE.COMPLETE,
                         streamPhase: undefined,
                         statusMessage: undefined,
                       }
                     : m
                 )
               );
-              await new Promise((r) =>
-                setTimeout(
-                  r,
-                  RETRY_DELAYS_MS[Math.min(attempt, RETRY_DELAYS_MS.length - 1)]
-                )
-              );
+              setIsTurnstileSessionVerified(true);
+              setTurnstileToken("");
+              turnstileRef.current?.reset();
+            }
+            break;
+          } catch (err) {
+            clearTimeout(timeoutId);
+            const isAbort = err instanceof Error && err.name === "AbortError";
+            content = isAbort
+              ? CHAT_TIMEOUT_MESSAGE
+              : CHAT_NETWORK_ERROR_MESSAGE;
+            if (isAbort && lastErrorStatus === 429) {
+              content = resolveChatErrorMessage(429);
+            }
+            if (attempt < maxAttempts - 1) {
+              await new Promise((r) => setTimeout(r, RETRY_DELAYS_MS[attempt]));
               continue;
             }
             break;
           }
+        }
 
-          clearTimeout(timeoutId);
+        if (didAttemptFetch && !chatRequestSucceeded && activeToken) {
+          setTurnstileToken("");
+          setTurnstileNonce((n) => n + 1);
+        }
 
-          const data = await parseChatResponse(res);
-
-          if (!res.ok) {
-            content = data.error || getChatErrorMessage(res, "Something went wrong. Please try again.");
-            if (res.status === 503 && maxAttempts === 3) {
-              maxAttempts = 4;
-            }
-            if (isRetryableStatus(res.status) && attempt < maxAttempts - 1) {
-              await new Promise((r) =>
-                setTimeout(
-                  r,
-                  RETRY_DELAYS_MS[Math.min(attempt, RETRY_DELAYS_MS.length - 1)]
-                )
-              );
-              continue;
-            }
-          } else {
-            const replyText = data.reply || "Sorry, I could not get a response.";
-            content = replyText;
-            chatRequestSucceeded = true;
-            const doneAt = Date.now();
-            setStreamingDraft(null);
-            setMessages((prev) =>
-              prev.map((m) =>
+        if (!chatRequestSucceeded) {
+          const assistantNow = Date.now();
+          const errorContent = content || "Something went wrong. Please try again.";
+          setStreamingDraft(null);
+          setMessages((prev) => {
+            const hasPlaceholder = prev.some((m) => m.id === assistantId);
+            if (hasPlaceholder) {
+              return prev.map((m) =>
                 m.id === assistantId
                   ? {
                       ...m,
-                      content: replyText,
-                      correlationId: data.correlationId,
-                      userPrompt: trimmed,
+                      content: errorContent,
+                      timestamp: assistantNow,
                       isComplete: true,
-                      timestamp: doneAt,
-                      lifecycle: ASSISTANT_LIFECYCLE.COMPLETE,
+                      lifecycle: ASSISTANT_LIFECYCLE.ERROR,
                       streamPhase: undefined,
                       statusMessage: undefined,
                     }
                   : m
-              )
-            );
-            setIsTurnstileSessionVerified(true);
-            setTurnstileToken("");
-            turnstileRef.current?.reset();
-          }
-          break;
-        } catch (err) {
-          clearTimeout(timeoutId);
-          const isAbort = err instanceof Error && err.name === "AbortError";
-          content = isAbort
-            ? CHAT_TIMEOUT_MESSAGE
-            : CHAT_NETWORK_ERROR_MESSAGE;
-          if (
-            isAbort &&
-            lastErrorStatus === 429
-          ) {
-            content = resolveChatErrorMessage(429);
-          }
-          if (attempt < maxAttempts - 1) {
-            await new Promise((r) => setTimeout(r, RETRY_DELAYS_MS[attempt]));
-            continue;
-          }
-          break;
+              );
+            }
+            return [
+              ...prev,
+              {
+                id: assistantId,
+                role: "assistant",
+                content: errorContent,
+                timestamp: assistantNow,
+                isComplete: true,
+                lifecycle: ASSISTANT_LIFECYCLE.ERROR,
+              },
+            ];
+          });
         }
-      }
 
-      if (didAttemptFetch && !chatRequestSucceeded && activeToken) {
-        setTurnstileToken("");
-        setTurnstileNonce((n) => n + 1);
-      }
-
-      if (!chatRequestSucceeded) {
-        const assistantNow = Date.now();
-        const errorContent = content || "Something went wrong. Please try again.";
+        if (chatRequestSucceeded) {
+          trackZarazEvent(ZARAZ_EVENTS.chatMessageSent, {
+            program: selectedProgram,
+            sessionCount: selectedSessions.length,
+          });
+        }
+      } catch {
+        const errorNow = Date.now();
         setStreamingDraft(null);
-        setMessages((prev) => {
-          const hasPlaceholder = prev.some((m) => m.id === assistantId);
-          if (hasPlaceholder) {
-            return prev.map((m) =>
-              m.id === assistantId
-                ? {
-                    ...m,
-                    content: errorContent,
-                    timestamp: assistantNow,
-                    isComplete: true,
-                    lifecycle: ASSISTANT_LIFECYCLE.ERROR,
-                    streamPhase: undefined,
-                    statusMessage: undefined,
-                  }
-                : m
-            );
-          }
-          return [
-            ...prev,
-            {
-              id: assistantId,
-              role: "assistant",
-              content: errorContent,
-              timestamp: assistantNow,
-              isComplete: true,
-              lifecycle: ASSISTANT_LIFECYCLE.ERROR,
-            },
-          ];
-        });
+        setMessages((prev) =>
+          prev.map((m) =>
+            m.id === assistantId
+              ? {
+                  ...m,
+                  content: "Something went wrong. Please try again.",
+                  timestamp: errorNow,
+                  isComplete: true,
+                  lifecycle: ASSISTANT_LIFECYCLE.ERROR,
+                  streamPhase: undefined,
+                  statusMessage: undefined,
+                }
+              : m
+          )
+        );
+      } finally {
+        setIsLoading(false);
+      }
+    },
+    [selectedProgram, selectedSessions]
+  );
+
+  const sendMessage = useCallback(
+    async (text: string) => {
+      const trimmed = text.trim();
+      if (!trimmed || isLoading || waitForTurnstileConfig) return;
+      if (trimmed.length > MAX_CHAT_MESSAGE_LENGTH) return;
+      prefetchTranscriptChunk();
+      void ensureCalendarMeta();
+
+      // Snapshot for this turn — picker changes during streaming apply to the next send only.
+      const modelIdForTurn = selectedModelId;
+      const historyMessages = messages;
+      const willSwapLayout = messages.length === 0;
+
+      const now = Date.now();
+      const assistantId = (now + 1).toString();
+      const userMessage: Message = {
+        id: now.toString(),
+        role: "user",
+        content: trimmed,
+        timestamp: now,
+      };
+
+      const assistantPlaceholder: Message = {
+        id: assistantId,
+        role: "assistant",
+        content: "",
+        isComplete: false,
+        timestamp: now,
+        userPrompt: trimmed,
+        reasoningUiSupported: supportsReasoningUi(modelIdForTurn),
+        lifecycle: ASSISTANT_LIFECYCLE.SUBMITTED,
+      };
+
+      // Optimistic UI first — layout + bubble must not wait on Turnstile.
+      setMessages([...messages, userMessage, assistantPlaceholder]);
+      setStreamingDraft({ id: assistantId, content: "" });
+      setInput("");
+      setIsLoading(true);
+      startLoadingState();
+
+      const activeToken = turnstileToken.trim();
+      if (requiresTurnstile && !activeToken) {
+        pendingSendRef.current = {
+          text: trimmed,
+          assistantId,
+          modelId: modelIdForTurn,
+          historyMessages,
+        };
+        pendingExecuteRef.current = true;
+        // Empty→transcript remounts the widget; wait for onReady instead of executing a dying instance.
+        if (turnstileMounted && !willSwapLayout) {
+          turnstileRef.current?.execute();
+        } else {
+          setTurnstileMounted(true);
+        }
+        return;
       }
 
-      if (chatRequestSucceeded) {
-        trackZarazEvent(ZARAZ_EVENTS.chatMessageSent, {
-          program: selectedProgram,
-          sessionCount: selectedSessions.length,
-        });
-      }
-    } catch {
-      const errorNow = Date.now();
-      const errorMessage: Message = {
-        id: (errorNow + 1).toString(),
-        role: "assistant",
-        content: "Something went wrong. Please try again.",
-        timestamp: errorNow,
-        isComplete: true,
-        lifecycle: ASSISTANT_LIFECYCLE.ERROR,
-      };
-      setStreamingDraft(null);
-      setMessages((prev) => [...prev, errorMessage]);
-    } finally {
-      setIsLoading(false);
-    }
-  }, [
-    isLoading,
-    messages,
-    requiresTurnstile,
-    selectedProgram,
-    selectedSessions,
-    selectedModelId,
-    startLoadingState,
-    turnstileToken,
-    turnstileMounted,
-    waitForTurnstileConfig,
-  ]);
+      await executeChatRequest(
+        trimmed,
+        assistantId,
+        modelIdForTurn,
+        activeToken,
+        historyMessages
+      );
+    },
+    [
+      isLoading,
+      messages,
+      requiresTurnstile,
+      selectedModelId,
+      startLoadingState,
+      turnstileToken,
+      turnstileMounted,
+      waitForTurnstileConfig,
+      executeChatRequest,
+    ]
+  );
 
   const handleTurnstileToken = useCallback(
     (token: string) => {
       setTurnstileToken(token);
       const pending = pendingSendRef.current;
-      if (!token.trim() || !pending) return;
+      if (!pending) return;
+      if (!token.trim()) {
+        failPendingTurnstile();
+        return;
+      }
       pendingSendRef.current = null;
-      void sendMessage(pending, token);
+      pendingExecuteRef.current = false;
+      void executeChatRequest(
+        pending.text,
+        pending.assistantId,
+        pending.modelId,
+        token,
+        pending.historyMessages
+      );
     },
-    [sendMessage]
+    [executeChatRequest, failPendingTurnstile]
   );
 
   const handleSubmit = async (e?: React.FormEvent) => {
@@ -1174,6 +1243,21 @@ export default function ChatPage() {
     }
   }, [isEmptyChat]);
 
+  // Warm Turnstile (api.js + render) on empty chat so first send usually only execute()s.
+  useEffect(() => {
+    if (!hasMounted || !isEmptyChat || !requiresTurnstile) return;
+    prefetchTranscriptChunk();
+    setTurnstileMounted(true);
+  }, [hasMounted, isEmptyChat, requiresTurnstile]);
+
+  const handleSuggestionSelect = useCallback(
+    (text: string) => {
+      requestComposerWarmup();
+      void sendMessage(text);
+    },
+    [requestComposerWarmup, sendMessage]
+  );
+
   const chatInputPlaceholder = isEmptyChat
     ? "How can I help you today?"
     : "Write a message...";
@@ -1278,7 +1362,7 @@ export default function ChatPage() {
             suggestions={suggestions}
             suggestionsDisabled={suggestionsDisabled}
             suggestionsLoading={suggestionsLoading}
-            onSuggestionSelect={sendMessage}
+            onSuggestionSelect={handleSuggestionSelect}
             composer={{
               ...composerFormProps,
               textareaRef,

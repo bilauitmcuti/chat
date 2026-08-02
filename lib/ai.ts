@@ -9,7 +9,7 @@ import {
   usesOpenAiFunctionToolFormat,
   type FlatToolDefinition,
 } from "@/lib/chat/agent/tool-format";
-import { getDynamicRouteModelId, isDynamicRoutingEnabled } from "@/lib/chat/dynamic-routes";
+import { getDynamicRouteModelId, usesDynamicRoute } from "@/lib/chat/dynamic-routes";
 import { CHAT_MAX_MESSAGE_LENGTH } from "@/lib/chat/limits";
 import { trimHistoryForModel } from "@/lib/chat/history-for-model";
 import { logger } from "@/lib/logger";
@@ -343,8 +343,9 @@ async function runViaAiRun(
 }
 
 /**
- * Prefer Dynamic Route for non-Gemma only when CHAT_USE_DYNAMIC_ROUTES is on;
- * otherwise AI.run(primary), then Gemma on model fallback errors.
+ * Prefer Dynamic Route when mapped (`dynamic/gemma-4` always; others when
+ * CHAT_USE_DYNAMIC_ROUTES is on); otherwise AI.run(primary), then Gemma on
+ * model fallback errors (non-Gemma only).
  */
 export async function runAiWithGateway(
   ai: Ai,
@@ -354,7 +355,7 @@ export async function runAiWithGateway(
 ): Promise<unknown> {
   const gatewayEnabled = await isAiGatewayEnabled();
   const dynamicModelId =
-    gatewayEnabled && isDynamicRoutingEnabled()
+    gatewayEnabled && usesDynamicRoute(modelId)
       ? getDynamicRouteModelId(modelId)
       : null;
 

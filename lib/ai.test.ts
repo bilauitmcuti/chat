@@ -330,27 +330,31 @@ describe("runAiWithGateway resilience", () => {
     expect(result).toEqual({ response: "from-gemma" });
   });
 
-  it("uses AI.run only for Gemma (no dynamic route)", async () => {
+  it("uses dynamic/gemma-4 for Gemma, then AI.run if dynamic fails", async () => {
     vi.stubEnv("AI_GATEWAY_ID", "buc-chat");
+    vi.stubEnv("CHAT_USE_DYNAMIC_ROUTES", "");
     const run = vi.fn().mockResolvedValue({ response: "gemma" });
-    const gatewayRun = vi.fn();
+    const gatewayRun = vi.fn().mockRejectedValue(
+      Object.assign(new Error("dynamic failed"), { status: 500 })
+    );
     const ai = {
       run,
       gateway: () => ({ run: gatewayRun }),
     } as unknown as Ai;
 
-    await runAiWithGateway(
+    const result = await runAiWithGateway(
       ai,
       DEFAULT_CHAT_MODEL,
       { messages: [{ role: "user", content: "hi" }] },
       { skipCache: true }
     );
 
-    expect(gatewayRun).not.toHaveBeenCalled();
+    expect(gatewayRun).toHaveBeenCalled();
     expect(run).toHaveBeenCalledWith(
       DEFAULT_CHAT_MODEL,
       expect.any(Object),
       expect.anything()
     );
+    expect(result).toEqual({ response: "gemma" });
   });
 });

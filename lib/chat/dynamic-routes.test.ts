@@ -14,12 +14,15 @@ import {
 } from "@/lib/chat/models";
 
 describe("getDynamicRouteModelId", () => {
-  it("returns null for Gemma 4 (direct AI.run path)", () => {
-    expect(getDynamicRouteModelId(CHAT_MODEL_GEMMA_4)).toBeNull();
-    expect(getDynamicRouteModelId(DEFAULT_CHAT_MODEL)).toBeNull();
+  it("maps Gemma 4 to dynamic/gemma-4", () => {
+    expect(getDynamicRouteModelId(CHAT_MODEL_GEMMA_4)).toBe("dynamic/gemma-4");
+    expect(getDynamicRouteModelId(DEFAULT_CHAT_MODEL)).toBe("dynamic/gemma-4");
+    expect(getDynamicRouteModelId("@cf/google/gemma-4-other")).toBe(
+      "dynamic/gemma-4"
+    );
   });
 
-  it("maps non-Gemma picker models to dynamic/<route>", () => {
+  it("maps picker models to dynamic/<route>", () => {
     expect(getDynamicRouteModelId(CHAT_MODEL_LLAMA_4_SCOUT)).toBe(
       "dynamic/llama-scout"
     );
@@ -48,18 +51,18 @@ describe("isDynamicRoutingEnabled / usesDynamicRoute", () => {
     vi.unstubAllEnvs();
   });
 
-  it("defaults to off", () => {
+  it("defaults non-Gemma Dynamic Routes off; Gemma always on", () => {
     vi.stubEnv("CHAT_USE_DYNAMIC_ROUTES", "");
     expect(isDynamicRoutingEnabled()).toBe(false);
     expect(usesDynamicRoute(CHAT_MODEL_LLAMA_4_SCOUT)).toBe(false);
-    expect(usesDynamicRoute(CHAT_MODEL_GEMMA_4)).toBe(false);
+    expect(usesDynamicRoute(CHAT_MODEL_GEMMA_4)).toBe(true);
   });
 
-  it("enables when CHAT_USE_DYNAMIC_ROUTES=1", () => {
+  it("enables non-Gemma when CHAT_USE_DYNAMIC_ROUTES=1", () => {
     vi.stubEnv("CHAT_USE_DYNAMIC_ROUTES", "1");
     expect(isDynamicRoutingEnabled()).toBe(true);
     expect(usesDynamicRoute(CHAT_MODEL_LLAMA_4_SCOUT)).toBe(true);
-    expect(usesDynamicRoute(CHAT_MODEL_GEMMA_4)).toBe(false);
+    expect(usesDynamicRoute(CHAT_MODEL_GEMMA_4)).toBe(true);
   });
 
   it("enables when CHAT_USE_DYNAMIC_ROUTES=true", () => {

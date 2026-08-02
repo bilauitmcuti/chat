@@ -26,7 +26,7 @@ npx wrangler login             # required for local Workers AI binding
 - `CHAT_USE_AGENT` — set to `0` or `false` to disable tool-calling agent globally. See [`lib/chat/agent/run-agent.ts`](lib/chat/agent/run-agent.ts).
 - `AI_GATEWAY_ID` — AI Gateway name (default / production: `buc-chat`). Declared in [`wrangler.jsonc`](wrangler.jsonc) `vars` and local `.env.local`. Set to `off` to bypass.
 - `SKIP_AI_GATEWAY=1` — chat calls Workers AI directly without gateway.
-- `CHAT_USE_DYNAMIC_ROUTES=1` — opt-in AI Gateway Dynamic Routes (`dynamic/*`) for non-Gemma. Default **off** (compat currently returns 400 Bad input); chat uses `AI.run` + app Gemma fallback instead.
+- `CHAT_USE_DYNAMIC_ROUTES=1` — opt-in AI Gateway Dynamic Routes (`dynamic/*`) for non-Gemma picker models. Default **off** (compat currently returns 400 Bad input for some models); those models use `AI.run` + app Gemma fallback instead. **Gemma always** tries `dynamic/gemma-4` when the gateway is on (dashboard fallback → Mistral Small).
 
 ## Commands
 
@@ -134,22 +134,24 @@ Chat routes Workers AI through AI Gateway via the third argument to `env.AI.run(
 2. Authentication **On**, log collection **On** (required for Dynamic Routing)
 3. Rate limiting / spend limits / caching as needed (suggested cache TTL 120s)
 
-### Dynamic Routing (non-Gemma fallback → Gemma 4)
+### Dynamic Routing
 
-**Default path:** non-Gemma models use `AI.run(selectedModel)` through the gateway binding, then one app-level retry with **Gemma 4** on timeout/unavailable/5xx. Gemma always uses `AI.run` only.
+**Gemma (default model):** always tries `dynamic/gemma-4` via AI Gateway compat when the gateway is enabled. Dashboard route: primary **Gemma 4**, fallback **Mistral Small 3.1**. If the dynamic route fails, app falls back to `AI.run(Gemma)`.
 
-**Opt-in Dynamic Routes:** set `CHAT_USE_DYNAMIC_ROUTES=1` to try `dynamic/<name>` via `env.AI.gateway("buc-chat").run({ provider: "compat", … })` first. Compat currently fails with HTTP 400 Bad input for Workers AI models (audio schema), so leave the flag off until Cloudflare/BYOK/compat is fixed. When enabled and the compat call fails, the app still falls back to `AI.run` then Gemma.
+**Other picker models:** `AI.run(selectedModel)` through the gateway binding, then one app-level retry with **Gemma 4** on timeout/unavailable/5xx.
+
+**Opt-in Dynamic Routes (non-Gemma):** set `CHAT_USE_DYNAMIC_ROUTES=1` to try `dynamic/<name>` via `env.AI.gateway("buc-chat").run({ provider: "compat", … })` first. Compat currently fails with HTTP 400 Bad input for some Workers AI models (audio schema), so leave the flag off for non-Gemma until Cloudflare/BYOK/compat is fixed. When enabled and the compat call fails, the app still falls back to `AI.run` then Gemma.
 
 | Route | Primary | Fallback |
 |-------|---------|----------|
-| `gemma-4` | Gemma 4 | — (defined for symmetry; app does not call it) |
+| `gemma-4` | Gemma 4 | Mistral Small 3.1 |
 | `llama-scout` | Llama 4 Scout | Gemma 4 |
 | `mistral-small` | Mistral Small 3.1 | Gemma 4 |
 | `nemotron` | Nemotron 3 Super | Gemma 4 |
 
-App mapping: [`lib/chat/dynamic-routes.ts`](lib/chat/dynamic-routes.ts). Routes may remain deployed on Cloudflare (`buc-chat` → Dynamic Routes) but are unused while the flag is off.
+App mapping: [`lib/chat/dynamic-routes.ts`](lib/chat/dynamic-routes.ts). Non-Gemma dynamic routes stay unused while `CHAT_USE_DYNAMIC_ROUTES` is off; Gemma always uses `dynamic/gemma-4`.
 
-**Verify:** non-Gemma chats complete without `Dynamic route failed` warnings when the flag is off. With the flag on, check AI Gateway logs / `cf-aig-model` once compat stops returning 400.
+**Verify:** Gemma chats hit `dynamic/gemma-4` (check AI Gateway logs / `cf-aig-model`); on route failure, `AI.run` Gemma still succeeds. Non-Gemma chats complete without `Dynamic route failed` warnings when the flag is off.
 
 ## Chat API
 

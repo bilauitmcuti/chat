@@ -343,9 +343,8 @@ async function runViaAiRun(
 }
 
 /**
- * Prefer Dynamic Route when mapped (`dynamic/gemma-4` always; others when
- * CHAT_USE_DYNAMIC_ROUTES is on); otherwise AI.run(primary), then Gemma on
- * model fallback errors (non-Gemma only).
+ * Prefer Dynamic Route when mapped and CHAT_USE_DYNAMIC_ROUTES is on;
+ * otherwise AI.run(primary), then Gemma on model fallback errors (non-Gemma only).
  */
 export async function runAiWithGateway(
   ai: Ai,

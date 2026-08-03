@@ -51,14 +51,14 @@ describe("isDynamicRoutingEnabled / usesDynamicRoute", () => {
     vi.unstubAllEnvs();
   });
 
-  it("defaults non-Gemma Dynamic Routes off; Gemma always on", () => {
+  it("defaults Dynamic Routes off for all models including Gemma", () => {
     vi.stubEnv("CHAT_USE_DYNAMIC_ROUTES", "");
     expect(isDynamicRoutingEnabled()).toBe(false);
     expect(usesDynamicRoute(CHAT_MODEL_LLAMA_4_SCOUT)).toBe(false);
-    expect(usesDynamicRoute(CHAT_MODEL_GEMMA_4)).toBe(true);
+    expect(usesDynamicRoute(CHAT_MODEL_GEMMA_4)).toBe(false);
   });
 
-  it("enables non-Gemma when CHAT_USE_DYNAMIC_ROUTES=1", () => {
+  it("enables all mapped models when CHAT_USE_DYNAMIC_ROUTES=1", () => {
     vi.stubEnv("CHAT_USE_DYNAMIC_ROUTES", "1");
     expect(isDynamicRoutingEnabled()).toBe(true);
     expect(usesDynamicRoute(CHAT_MODEL_LLAMA_4_SCOUT)).toBe(true);

@@ -44,7 +44,7 @@ export function getDynamicRouteModelId(modelId: string): string | null {
 }
 
 /**
- * Opt-in for non-Gemma Dynamic Routes via compat.
+ * Opt-in for AI Gateway Dynamic Routes via compat (all picker models including Gemma).
  * Default off — compat currently returns 400 Bad input for some Workers AI models;
  * chat uses `AI.run` + app Gemma fallback instead.
  */
@@ -55,12 +55,9 @@ export function isDynamicRoutingEnabled(): boolean {
 
 /**
  * Whether this model should call `dynamic/<route>` before `AI.run`.
- * Gemma always uses `dynamic/gemma-4` (dashboard fallback → Mistral Small).
- * Other picker models require `CHAT_USE_DYNAMIC_ROUTES=1`.
+ * All mapped models (including Gemma) require `CHAT_USE_DYNAMIC_ROUTES=1`.
  */
 export function usesDynamicRoute(modelId: string): boolean {
-  const routeId = getDynamicRouteModelId(modelId);
-  if (!routeId) return false;
-  if (routeId === `dynamic/${DYNAMIC_ROUTE_GEMMA_4}`) return true;
+  if (!getDynamicRouteModelId(modelId)) return false;
   return isDynamicRoutingEnabled();
 }

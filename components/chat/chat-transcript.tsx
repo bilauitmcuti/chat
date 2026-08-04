@@ -95,10 +95,10 @@ export function ChatTranscript({
             ) : null}
           </MessageScrollerContent>
         </MessageScrollerViewport>
-        {/* Overlay, not a transcript row — the challenge never reserves or shifts message layout. */}
+        {/* Overlay above composer — widget only, no card chrome. */}
         {showTurnstileChallenge ? (
           <div className="pointer-events-none absolute inset-x-0 bottom-0 z-20 flex justify-center px-2 pb-2">
-            <div className="pointer-events-auto w-full max-w-[320px] rounded-lg border border-border bg-background/95 p-1 shadow-sm backdrop-blur">
+            <div className="pointer-events-auto w-full max-w-[320px]">
               <TurnstileWidget
                 ref={turnstileRef}
                 key={turnstileNonce}

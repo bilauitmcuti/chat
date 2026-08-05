@@ -7,10 +7,15 @@ yarn.lock
 
 # next.js
 /.next/
+**/.next/
 /out/
 /.open-next/
 .wrangler/
 .next-build-id
+
+# macOS AppleDouble metadata (common on external volumes)
+._*
+**/._*
 
 # production
 /build

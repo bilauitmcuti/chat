@@ -2,7 +2,13 @@ import nextConfig from "eslint-config-next";
 
 const eslintConfig = [
   {
-    ignores: [".open-next/**", ".vercel/**", ".next/**"],
+    ignores: [
+      "**/node_modules/**",
+      "**/.next/**",
+      ".open-next/**",
+      ".vercel/**",
+      "**/._*",
+    ],
   },
   ...nextConfig,
   {

@@ -43,7 +43,8 @@ function WalkthroughStepIndicator({
         <button
           key={index}
           type="button"
-          className="flex size-6 items-center justify-center rounded-full outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2"
+          tabIndex={-1}
+          className="flex size-6 items-center justify-center rounded-full outline-none focus:outline-none"
           aria-label={`Go to step ${index + 1}`}
           aria-current={index === step ? "step" : undefined}
           onClick={() => onStepSelect(index)}

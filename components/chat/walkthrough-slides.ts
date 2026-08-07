@@ -12,7 +12,7 @@ export interface WalkthroughSlide {
 
 export const WALKTHROUGH_SLIDES: readonly WalkthroughSlide[] = [
   {
-    title: "Ask Bila",
+    title: "Ask Bila about your calendar",
     description:
       "UiTM academic dates and Malaysia public holidays — ask in plain language.",
     preview: "chat",
@@ -32,7 +32,7 @@ export const WALKTHROUGH_SLIDES: readonly WalkthroughSlide[] = [
   {
     title: "Choose an AI model",
     description:
-      "Switch models in the composer — Gemma 4 for most questions, or try Llama, Mistral, and Nemotron.",
+      "Pick a model in the composer. Gemma 4 is best for calendars, Llama/Mistral are faster, Nemotron is stronger at reasoning.",
     preview: "models",
   },
 ] as const;

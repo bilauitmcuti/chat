@@ -493,7 +493,7 @@ export function getCompletionInstruction(
 export function getMinimalChitchatInstruction(): string {
   return (
     "\n\nCHITCHAT TURN: The user sent only a short greeting or test phrase (e.g. hi, hey, hello, salam, test, ok, hmm). " +
-    'Reply in 1–2 short friendly sentences as "Bila UiTM Cuti?". Greet them, briefly say you can help with UiTM academic calendar, cuti, lecture weeks, public holidays, and student info, and invite their question. ' +
+    'Reply in 1–2 short friendly sentences as "Bila". Introduce yourself by name once (e.g. "I\'m Bila" in English or "Saya Bila" in Bahasa Melayu — match the user\'s language), briefly say you can help with UiTM academic calendar, cuti, lecture weeks, public holidays, and student info, and invite their question. ' +
     "Do NOT list dates, schedules, tables, or calendar events. Do NOT invent facts. Do NOT dump context blocks."
   );
 }

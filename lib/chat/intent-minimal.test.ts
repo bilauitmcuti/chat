@@ -30,7 +30,10 @@ describe("getMinimalChitchatInstruction", () => {
   it("asks for a short greeting without calendar dumps", () => {
     const instruction = getMinimalChitchatInstruction();
     expect(instruction).toContain("CHITCHAT TURN");
+    expect(instruction).toContain('as "Bila"');
+    expect(instruction).toContain("Introduce yourself by name once");
     expect(instruction).toContain("1–2 short friendly sentences");
     expect(instruction).toContain("Do NOT list dates");
+    expect(instruction).not.toContain("Bila UiTM Cuti?");
   });
 });

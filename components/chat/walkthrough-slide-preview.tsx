@@ -95,11 +95,10 @@ function SuggestionsPreviewMock() {
 /** Slide 3 — programme picker: centred menu (same shell as slide 4). */
 function ComposerPreviewMock() {
   return (
-    <div className="flex h-full min-h-0 w-full items-center justify-center overflow-hidden py-3 sm:py-4">
+    <div className="flex h-full min-h-0 w-full items-start justify-center overflow-hidden pt-6 sm:pt-8">
       <ChatProgramDropdownPreview
-        scrollable
         compact
-        className="mx-auto max-h-full min-h-0 w-[260px] max-w-full shrink-0"
+        className="mx-auto w-[260px] max-w-full shrink-0"
       />
     </div>
   );

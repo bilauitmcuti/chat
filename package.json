@@ -9,7 +9,7 @@
   "scripts": {
     "build": "opennextjs-cloudflare build && node scripts/mirror-chat-assets.mjs",
     "build:worker": "opennextjs-cloudflare build && node scripts/mirror-chat-assets.mjs",
-    "dev": "next dev",
+    "dev": "node scripts/dev.mjs",
     "lint": "eslint .",
     "typecheck": "tsc --noEmit",
     "test:smoke": "node scripts/smoke.mjs",

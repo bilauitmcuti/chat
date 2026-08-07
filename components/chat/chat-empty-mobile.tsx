@@ -68,7 +68,7 @@ export function ChatEmptyMobile({
           ) : null}
           <EmptyHeader>
             <EmptyTitle className="text-2xl sm:text-3xl font-semibold tracking-tight text-balance">
-              Ask AI, get instant answers
+              Ask Bila about your calendar
             </EmptyTitle>
             <EmptyDescription className="max-w-sm text-balance lg:hidden">
               Ask about academic calendars or public holidays. Select your programme, or type @ to

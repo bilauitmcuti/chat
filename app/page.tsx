@@ -23,6 +23,7 @@ import {
 import { trackZarazEvent, ZARAZ_EVENTS } from "@/lib/zaraz";
 import { useTurnstileSiteKeyFromContext } from "@/hooks/use-turnstile-site-key";
 import type { TurnstileWidgetHandle } from "@/components/turnstile-widget";
+import { ChatWalkthrough } from "@/components/chat/chat-walkthrough";
 import { ChatEmptyMobile } from "@/components/chat/chat-empty-mobile";
 import { ChatComposer } from "@/components/chat/chat-composer";
 import { ChatTranscript } from "@/components/chat/chat-transcript";
@@ -1238,7 +1239,7 @@ export default function ChatPage() {
   );
 
   const chatInputPlaceholder = isEmptyChat
-    ? "How can I help you today?"
+    ? "Ask Bila…"
     : "Write a message...";
   const chatInputPlaceholderDesktop = isEmptyChat
     ? "Ask about calendars or holidays. Select your programme, or type @ to mention one."
@@ -1305,6 +1306,7 @@ export default function ChatPage() {
 
   return (
     <div className="relative flex h-dvh flex-col overflow-hidden bg-background text-foreground" data-nosnippet>
+      <ChatWalkthrough />
       <ModelShortcut
         modelIds={chatModelIds}
         selectedModelId={selectedModelId}

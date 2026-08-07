@@ -1,4 +1,5 @@
 import { Skeleton } from "@/components/ui/skeleton";
+import { ChatComposerLoadingPreview } from "@/components/chat/chat-composer-preview";
 import {
   Empty,
   EmptyDescription,
@@ -17,20 +18,6 @@ const CHIP_SKELETON_WIDTHS = [
   "w-44",
 ] as const;
 
-function ComposerLoadingFrame() {
-  return (
-    <div
-      aria-hidden
-      className="mx-auto flex h-[106px] w-full min-w-0 max-w-[600px] flex-col justify-end rounded-[10px] border border-border bg-secondary px-3 py-2"
-    >
-      <div className="flex items-center justify-between text-sm font-medium text-primary">
-        <span>All</span>
-        <span>Gemma 4</span>
-      </div>
-    </div>
-  );
-}
-
 function EmptyChatLoadingDesktop() {
   return (
     <div className="hidden min-h-0 min-w-0 flex-1 flex-col overflow-hidden lg:flex">
@@ -39,11 +26,11 @@ function EmptyChatLoadingDesktop() {
           <Empty className="mb-6 flex-none border-none p-0">
             <EmptyHeader>
               <EmptyTitle className="text-2xl sm:text-3xl font-semibold tracking-tight text-balance">
-                Ask AI, get instant answers
+                Ask Bila about your calendar
               </EmptyTitle>
             </EmptyHeader>
           </Empty>
-          <ComposerLoadingFrame />
+          <ChatComposerLoadingPreview />
           <div className="mt-2 min-h-[10rem] w-full">
             <div className="flex flex-col gap-1">
               {STACK_SKELETON_WIDTHS.map((width, index) => (
@@ -66,7 +53,7 @@ function EmptyChatLoadingMobile() {
         <Empty className="mx-auto max-w-[600px] flex-none border-none p-0">
           <EmptyHeader>
             <EmptyTitle className="text-2xl sm:text-3xl font-semibold tracking-tight text-balance">
-              Ask AI, get instant answers
+              Ask Bila about your calendar
             </EmptyTitle>
             <EmptyDescription className="max-w-sm text-balance">
               Ask about academic calendars or public holidays. Select your programme, or type @ to
@@ -88,7 +75,7 @@ function EmptyChatLoadingMobile() {
           </div>
         </div>
         <div className="px-2 md:px-0">
-          <ComposerLoadingFrame />
+          <ChatComposerLoadingPreview />
         </div>
         <span className="mx-auto mt-2 block w-full min-w-0 max-w-[600px] px-2 text-center text-xs text-muted-foreground md:px-0">
           AI can make mistakes. Check important info.

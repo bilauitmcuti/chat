@@ -65,7 +65,7 @@ export function ChatEmptyDesktop({
           ) : null}
           <EmptyHeader>
             <EmptyTitle className="text-2xl sm:text-3xl font-semibold tracking-tight text-balance">
-              Ask AI, get instant answers
+              Ask Bila about your calendar
             </EmptyTitle>
           </EmptyHeader>
         </Empty>

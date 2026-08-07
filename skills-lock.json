@@ -12,6 +12,12 @@
       "sourceType": "github",
       "skillPath": "skills/shadcn/SKILL.md",
       "computedHash": "4f78ff7cd3a4f637b6fe30dbbab4a80a19dd63fa62d9352bed461ccfdbcbbf43"
+    },
+    "ux-writer": {
+      "source": "shahrulestar/skills",
+      "sourceType": "github",
+      "skillPath": "skills/ux-writer/SKILL.md",
+      "computedHash": "6b036ae6fe606dee056713b4ac627bd426f20ba45cd1bdd106422e38fde1638e"
     }
   }
 }

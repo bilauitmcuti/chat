@@ -10,6 +10,7 @@ yarn.lock
 **/.next/
 /out/
 /.open-next/
+.wrangler
 .wrangler/
 .next-build-id
 

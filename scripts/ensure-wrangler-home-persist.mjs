@@ -15,6 +15,22 @@ const projectRoot = process.cwd();
 const wranglerLink = path.join(projectRoot, ".wrangler");
 const homePersist = path.join(os.homedir(), ".cache", "buc-chat-wrangler");
 
+/** Never create or mutate `.wrangler` in CI / Cloudflare Builds. */
+function isCiOrBuildEnvironment() {
+  return (
+    process.env.CI === "true" ||
+    process.env.CI === "1" ||
+    Boolean(process.env.CF_PAGES) ||
+    Boolean(process.env.CF_PAGES_URL) ||
+    Boolean(process.env.WORKERS_CI) ||
+    Boolean(process.env.CLOUDFLARE_BUILD)
+  );
+}
+
+if (isCiOrBuildEnvironment()) {
+  process.exit(0);
+}
+
 fs.mkdirSync(homePersist, { recursive: true });
 
 function resolveExistingLinkTarget() {

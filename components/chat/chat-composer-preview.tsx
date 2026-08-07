@@ -174,7 +174,7 @@ export function ChatProgramDropdownPreview({
             <li
               key={opt.label}
               className={cn(
-                "relative cursor-default rounded-sm font-medium",
+                "relative cursor-default rounded-sm px-2 font-medium",
                 compact ? "py-1 pr-7 text-xs" : "py-1.5 pr-8 text-sm",
                 index === 0 && "mt-0",
                 opt.selected ? "text-primary" : "text-foreground"

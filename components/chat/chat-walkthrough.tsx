@@ -101,7 +101,7 @@ function WalkthroughActions({
 
   return (
     <DialogFooter className="gap-2 sm:justify-end sm:[&>*]:flex-none">
-      <Button type="button" variant="ghost" onClick={onSkip}>
+      <Button type="button" variant="outline" onClick={onSkip}>
         {WALKTHROUGH_LABEL_SKIP}
       </Button>
       <Button type="button" onClick={onNext}>

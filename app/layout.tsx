@@ -65,7 +65,7 @@ export const metadata: Metadata = {
     locale: "ms_MY",
     images: [
       {
-        url: `${SITE_ORIGIN}/og/chat.png`,
+        url: "/chat.png",
         width: 1200,
         height: 630,
         alt: CHAT_SEO_TITLE,
@@ -76,7 +76,7 @@ export const metadata: Metadata = {
     card: "summary_large_image",
     title: CHAT_SEO_TITLE,
     description: CHAT_SEO_DESCRIPTION,
-    images: [`${SITE_ORIGIN}/og/chat.png`],
+    images: ["/chat.png"],
   },
   icons: {
     icon: [

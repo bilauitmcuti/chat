@@ -18,7 +18,7 @@ The product stays focused on calendar and UiTM orientation questions. It is not 
 
 Users can pick a Cloudflare Workers AI model in the chat composer. All picker models support **function calling** (tool use).
 
-Models
+![Workers AI model picker](./public/models.png)
 
 The chat composer lets users pick from multiple Cloudflare Workers AI models, including Gemma 4 (default), Llama 4 Scout, Mistral Small 3.1, and Nemotron 3 Super. All available models support function calling, enabling the assistant to look up academic facts before answering.
 

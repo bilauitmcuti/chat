@@ -85,6 +85,28 @@ interface PendingSend {
   historyMessages: Message[];
 }
 
+function readTurnstileCookieVerified(): boolean {
+  return document.cookie
+    .split(";")
+    .some((item) => item.trim().startsWith(`${CHAT_TURNSTILE_COOKIE}=1`));
+}
+
+/** Re-read the verified cookie when the tab becomes active again (focus / bfcache). */
+function subscribeTurnstileCookie(onStoreChange: () => void): () => void {
+  const notify = () => onStoreChange();
+  const onVisible = () => {
+    if (document.visibilityState === "visible") notify();
+  };
+  document.addEventListener("visibilitychange", onVisible);
+  window.addEventListener("focus", notify);
+  window.addEventListener("pageshow", notify);
+  return () => {
+    document.removeEventListener("visibilitychange", onVisible);
+    window.removeEventListener("focus", notify);
+    window.removeEventListener("pageshow", notify);
+  };
+}
+
 function withThinkingMetadata(message: Message, now = Date.now()): Message {
   const meta = captureThinkingMetadata(message.timestamp, {
     now,
@@ -129,11 +151,8 @@ export default function ChatPage() {
   const pendingSendRef = useRef<PendingSend | null>(null);
   const pendingExecuteRef = useRef(false);
   const turnstileCookieVerified = useSyncExternalStore(
-    () => () => {},
-    () =>
-      document.cookie
-        .split(";")
-        .some((item) => item.trim().startsWith(`${CHAT_TURNSTILE_COOKIE}=1`)),
+    subscribeTurnstileCookie,
+    readTurnstileCookieVerified,
     () => false
   );
   const isTurnstileVerified = turnstileCookieVerified || isTurnstileSessionVerified;
@@ -201,6 +220,27 @@ export default function ChatPage() {
     turnstileMounted &&
     requiresTurnstile &&
     !turnstileToken.trim();
+
+  // Drop sticky session verification when the 12h cookie is gone (tab refocus / bfcache).
+  useEffect(() => {
+    if (!isTurnstileSessionVerified) return;
+
+    const reconcile = () => {
+      if (document.visibilityState !== "visible") return;
+      if (readTurnstileCookieVerified()) return;
+      setIsTurnstileSessionVerified(false);
+    };
+
+    reconcile();
+    document.addEventListener("visibilitychange", reconcile);
+    window.addEventListener("focus", reconcile);
+    window.addEventListener("pageshow", reconcile);
+    return () => {
+      document.removeEventListener("visibilitychange", reconcile);
+      window.removeEventListener("focus", reconcile);
+      window.removeEventListener("pageshow", reconcile);
+    };
+  }, [isTurnstileSessionVerified]);
 
   useLayoutEffect(() => {
     setHasMounted(true);
@@ -359,6 +399,12 @@ export default function ChatPage() {
   }, [selectedProgram, programOptions]);
   const textareaRef = useRef<HTMLTextAreaElement>(null);
   const turnstileRef = useRef<TurnstileWidgetHandle>(null);
+  const isEmptyChatRef = useRef(messages.length === 0);
+  const requiresTurnstileRef = useRef(requiresTurnstile);
+  const turnstileTokenRef = useRef(turnstileToken);
+  isEmptyChatRef.current = messages.length === 0;
+  requiresTurnstileRef.current = requiresTurnstile;
+  turnstileTokenRef.current = turnstileToken;
 
   const requestComposerWarmup = useCallback(() => {
     void ensureCalendarMeta();
@@ -372,9 +418,19 @@ export default function ChatPage() {
   }, []);
 
   const handleTurnstileReady = useCallback(() => {
-    if (!pendingExecuteRef.current) return;
-    pendingExecuteRef.current = false;
-    turnstileRef.current?.execute();
+    if (pendingExecuteRef.current) {
+      pendingExecuteRef.current = false;
+      turnstileRef.current?.execute();
+      return;
+    }
+    // Empty layout: require verify before first send when unverified / expired.
+    if (
+      isEmptyChatRef.current &&
+      requiresTurnstileRef.current &&
+      !turnstileTokenRef.current.trim()
+    ) {
+      turnstileRef.current?.execute();
+    }
   }, []);
 
   const groupAOptions = useMemo(() => programOptions.filter(p => p.group === 'A'), [programOptions]);

@@ -1,4 +1,5 @@
 import type { Metadata } from "next";
+import { headers } from "next/headers";
 import React, { Suspense } from "react";
 import { ThemeProvider } from "@/components/theme-provider";
 import { ThemeShortcut } from "@/components/theme-shortcut";
@@ -16,77 +17,89 @@ import {
   CHAT_SEO_DESCRIPTION,
   CHAT_SEO_TITLE,
   SITE_ORIGIN,
+  resolveSeoTargets,
 } from "@/lib/page-seo";
 import { getTurnstileSiteKey } from "@/lib/turnstile-config";
 
-export const metadata: Metadata = {
-  metadataBase: new URL(SITE_ORIGIN),
-  title: {
-    default: CHAT_SEO_TITLE,
-    template: "%s",
-  },
-  applicationName: "Bila UiTM Cuti Chat",
-  other: {
-    site_name: "Bila UiTM Cuti Chat",
-  },
-  description: CHAT_SEO_DESCRIPTION,
-  keywords: [
-    "UiTM",
-    "chat",
-    "AI",
-    "academic calendar",
-    "Bila UiTM Cuti",
-    "cuti UiTM",
-    "UiTM Assistant",
-    "AI Chat UiTM",
-    "Bila UiTM Cuti Chat",
-  ],
-  generator: "Next.js",
-  authors: [{ name: "Bila UiTM Cuti", url: SITE_ORIGIN }],
-  creator: "Bila UiTM Cuti",
-  category: "education",
-  robots: {
-    index: false,
-    follow: false,
-    googleBot: {
+/**
+ * Host-aware metadata: apex serves the UI at /chat, subdomain at root. Resolving
+ * metadataBase + og:url from the request host keeps social previews self-referential
+ * (same-origin OG image, matching og:url) so unfurls work on both hosts. Canonical
+ * stays on the subdomain (SITE_ORIGIN) for SEO consolidation.
+ */
+export async function generateMetadata(): Promise<Metadata> {
+  const host = (await headers()).get("host");
+  const { origin, shareUrl } = resolveSeoTargets(host);
+
+  return {
+    metadataBase: new URL(origin),
+    title: {
+      default: CHAT_SEO_TITLE,
+      template: "%s",
+    },
+    applicationName: "Bila UiTM Cuti Chat",
+    other: {
+      site_name: "Bila UiTM Cuti Chat",
+    },
+    description: CHAT_SEO_DESCRIPTION,
+    keywords: [
+      "UiTM",
+      "chat",
+      "AI",
+      "academic calendar",
+      "Bila UiTM Cuti",
+      "cuti UiTM",
+      "UiTM Assistant",
+      "AI Chat UiTM",
+      "Bila UiTM Cuti Chat",
+    ],
+    generator: "Next.js",
+    authors: [{ name: "Bila UiTM Cuti", url: SITE_ORIGIN }],
+    creator: "Bila UiTM Cuti",
+    category: "education",
+    robots: {
       index: false,
       follow: false,
-    },
-  },
-  alternates: {
-    canonical: SITE_ORIGIN,
-  },
-  openGraph: {
-    siteName: "Bila UiTM Cuti Chat",
-    title: CHAT_SEO_TITLE,
-    description: CHAT_SEO_DESCRIPTION,
-    type: "website",
-    url: SITE_ORIGIN,
-    locale: "ms_MY",
-    images: [
-      {
-        url: "/chat.png",
-        width: 1200,
-        height: 630,
-        alt: CHAT_SEO_TITLE,
+      googleBot: {
+        index: false,
+        follow: false,
       },
-    ],
-  },
-  twitter: {
-    card: "summary_large_image",
-    title: CHAT_SEO_TITLE,
-    description: CHAT_SEO_DESCRIPTION,
-    images: ["/chat.png"],
-  },
-  icons: {
-    icon: [
-      { url: "/favicon-16x16.png", sizes: "16x16", type: "image/png" },
-      { url: "/favicon-32x32.png", sizes: "32x32", type: "image/png" },
-      { url: "/favicon.ico" },
-    ],
-    apple: "/apple-touch-icon.png",
-  },
-};
+    },
+    alternates: {
+      canonical: SITE_ORIGIN,
+    },
+    openGraph: {
+      siteName: "Bila UiTM Cuti Chat",
+      title: CHAT_SEO_TITLE,
+      description: CHAT_SEO_DESCRIPTION,
+      type: "website",
+      url: shareUrl,
+      locale: "ms_MY",
+      images: [
+        {
+          url: "/chat.png",
+          width: 1200,
+          height: 630,
+          alt: CHAT_SEO_TITLE,
+        },
+      ],
+    },
+    twitter: {
+      card: "summary_large_image",
+      title: CHAT_SEO_TITLE,
+      description: CHAT_SEO_DESCRIPTION,
+      images: ["/chat.png"],
+    },
+    icons: {
+      icon: [
+        { url: `${SITE_ORIGIN}/favicon-16x16.png`, sizes: "16x16", type: "image/png" },
+        { url: `${SITE_ORIGIN}/favicon-32x32.png`, sizes: "32x32", type: "image/png" },
+        { url: `${SITE_ORIGIN}/favicon.ico` },
+      ],
+      apple: `${SITE_ORIGIN}/apple-touch-icon.png`,
+    },
+  };
+}
 
 export const viewport = {
   width: "device-width",

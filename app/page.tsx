@@ -29,7 +29,6 @@ import { ChatComposer } from "@/components/chat/chat-composer";
 import { ChatTranscript } from "@/components/chat/chat-transcript";
 import { ModelShortcut } from "@/components/model-shortcut";
 import { getRandomSuggestions } from "@/components/chat/suggestion-data";
-import { DESKTOP_VIEWPORT_QUERY } from "@/lib/use-mobile-viewport";
 import {
   ensureCalendarMeta,
   getCalendarMetaStatus,
@@ -711,7 +710,7 @@ export default function ChatPage() {
                 res,
                 {
                   onReasoning: () => {
-                    /* Thinking-only UX — ignore server reasoning paragraphs. */
+                    /* Thinking shimmer only — ignore server reasoning paragraphs. */
                   },
                   onToken: (token) => {
                     if (!answerStarted && token.trim()) {
@@ -1272,19 +1271,6 @@ export default function ChatPage() {
   }, [messages]);
 
   const isEmptyChat = messages.length === 0;
-
-  useLayoutEffect(() => {
-    if (!isEmptyChat) return;
-    if (window.matchMedia(DESKTOP_VIEWPORT_QUERY).matches) {
-      textareaRef.current?.focus({ preventScroll: true });
-    }
-  }, [isEmptyChat]);
-
-  // Warm Turnstile (api.js + render) on empty chat so first send usually only execute()s.
-  useEffect(() => {
-    if (!hasMounted || !isEmptyChat || !requiresTurnstile) return;
-    setTurnstileMounted(true);
-  }, [hasMounted, isEmptyChat, requiresTurnstile]);
 
   const handleSuggestionSelect = useCallback(
     (text: string) => {

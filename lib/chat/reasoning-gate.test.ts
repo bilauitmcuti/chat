@@ -9,6 +9,7 @@ import {
   REASONING_PARAGRAPH_DELAY_MS,
   shouldEmitReasoningParagraph,
   shouldEmitReasoningPhase,
+  resolveAssistantPendingUi,
   shouldRenderReasoningUi,
   shouldShowCompletedDurationLabel,
   shouldShowCompletedThinkingBlock,
@@ -255,5 +256,70 @@ describe("reasoning-gate", () => {
         thinkingDurationSec: 3,
       })
     ).toBe(false);
+  });
+
+  it("shows brain icon for non-reasoning models while thinking", () => {
+    expect(
+      resolveAssistantPendingUi({
+        reasoningUiSupported: false,
+        isThinkingPhase: true,
+        showThinking: true,
+        isRegenerating: false,
+        hasProgressLabel: false,
+      })
+    ).toEqual({
+      showBrainIcon: true,
+      showThinkingShimmer: false,
+      showRetryStatus: false,
+    });
+  });
+
+  it("shows thinking shimmer for reasoning models while pending", () => {
+    expect(
+      resolveAssistantPendingUi({
+        reasoningUiSupported: true,
+        isThinkingPhase: true,
+        showThinking: true,
+        isRegenerating: false,
+        hasProgressLabel: false,
+      })
+    ).toEqual({
+      showBrainIcon: false,
+      showThinkingShimmer: true,
+      showRetryStatus: false,
+    });
+  });
+
+  it("does not show brain icon during retry status", () => {
+    expect(
+      resolveAssistantPendingUi({
+        reasoningUiSupported: false,
+        isThinkingPhase: false,
+        showThinking: false,
+        isRegenerating: true,
+        hasProgressLabel: true,
+      })
+    ).toEqual({
+      showBrainIcon: false,
+      showThinkingShimmer: false,
+      showRetryStatus: true,
+    });
+  });
+
+  it("hides thinking shimmer on minimal turns", () => {
+    expect(
+      resolveAssistantPendingUi({
+        reasoningUiSupported: true,
+        isMinimalTurn: true,
+        isThinkingPhase: true,
+        showThinking: true,
+        isRegenerating: false,
+        hasProgressLabel: false,
+      })
+    ).toEqual({
+      showBrainIcon: false,
+      showThinkingShimmer: false,
+      showRetryStatus: false,
+    });
   });
 });

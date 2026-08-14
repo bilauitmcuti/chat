@@ -32,7 +32,7 @@ export const WALKTHROUGH_SLIDES: readonly WalkthroughSlide[] = [
   {
     title: "Choose an AI model",
     description:
-      "Pick a model in the composer. Gemma 4 is best for calendars, Llama/Mistral are faster, Nemotron is stronger at reasoning.",
+      "Switch models in the composer — Gemma for calendars, Llama/Mistral for speed, Nemotron for reasoning.",
     preview: "models",
   },
 ] as const;

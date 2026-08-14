@@ -193,3 +193,38 @@ export function shouldRenderReasoningUi(input: RenderReasoningUiInput): boolean 
     showCompletedBlock
   );
 }
+
+export interface AssistantPendingUiInput {
+  reasoningUiSupported?: boolean;
+  isMinimalTurn?: boolean;
+  isThinkingPhase: boolean;
+  showThinking: boolean;
+  isRegenerating: boolean;
+  hasProgressLabel: boolean;
+}
+
+export interface AssistantPendingUi {
+  showBrainIcon: boolean;
+  showThinkingShimmer: boolean;
+  showRetryStatus: boolean;
+}
+
+export function resolveAssistantPendingUi(
+  input: AssistantPendingUiInput
+): AssistantPendingUi {
+  const showRetryStatus = input.isRegenerating && input.hasProgressLabel;
+  const reasoningSupported = input.reasoningUiSupported !== false;
+  const showBrainIcon =
+    input.isThinkingPhase &&
+    input.showThinking &&
+    !reasoningSupported &&
+    !showRetryStatus;
+  const showThinkingShimmer =
+    reasoningSupported &&
+    !input.isMinimalTurn &&
+    input.isThinkingPhase &&
+    input.showThinking &&
+    !showRetryStatus;
+
+  return { showBrainIcon, showThinkingShimmer, showRetryStatus };
+}

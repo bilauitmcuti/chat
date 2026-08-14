@@ -1,11 +1,8 @@
 "use client";
 
-import {
-  Reasoning,
-  ReasoningTrigger,
-} from "@/components/ai-elements/reasoning";
 import { HugeiconsIcon } from "@hugeicons/react";
 import {
+  Brain03Icon,
   Tick02Icon,
   Copy01Icon,
   PencilEdit02Icon,
@@ -33,8 +30,8 @@ import {
 } from "@/components/ui/message-scroller";
 import { cn } from "@/lib/utils";
 import { type ChatMessageItem, type ChatStreamingDraft } from "@/components/chat/chat-utils";
-import { useLiveDurationSec } from "@/components/chat/use-live-duration-sec";
 import { useReasoningVisibility } from "@/components/chat/use-reasoning-visibility";
+import { resolveAssistantPendingUi } from "@/lib/chat/reasoning-gate";
 import { CHAT_STREAM_PHASE } from "@/lib/chat/stream-phase";
 import { isMinimalConversationalMessage } from "@/lib/chat/intent";
 import dynamic from "next/dynamic";
@@ -44,11 +41,7 @@ const StreamdownRenderer = dynamic(
     import("@/components/ui/streamdown-renderer").then((mod) => mod.StreamdownRenderer),
   {
     ssr: false,
-    loading: () => (
-      <p className="text-sm leading-relaxed whitespace-pre-wrap break-words text-muted-foreground md:text-[0.9375rem]">
-        …
-      </p>
-    ),
+    loading: () => null,
   }
 );
 
@@ -102,25 +95,16 @@ export function ChatMessageRow({
     message.timestamp
   );
 
-  // Pending until answer text exists — clears on first painted content or error.
-  const showThinkingUi = isThinkingPhase && showThinking;
-  const showLiveRegenerating = isRegenerating && Boolean(progressLabel);
-  const liveDurationSec = useLiveDurationSec(
-    message.timestamp,
-    assistantInProgress && message.thinkingDurationSec === undefined
-  );
-  const resolvedDurationSec = message.thinkingDurationSec ?? liveDurationSec;
   const isMinimalTurn = isMinimalConversationalMessage(message.userPrompt ?? "");
-  /**
-   * Pending shimmer for every supported model as soon as the turn is submitted.
-   * Reasoning paragraphs (if any) stay gated by reasoningUiSupported + non-minimal.
-   */
-  const showPendingHeader = showThinkingUi || showLiveRegenerating;
-  const showReasoningCapableHeader =
-    message.reasoningUiSupported !== false &&
-    !isMinimalTurn &&
-    Boolean(message.reasoning?.trim());
-  const showThoughtHeader = showPendingHeader || showReasoningCapableHeader;
+  const { showBrainIcon, showThinkingShimmer, showRetryStatus } =
+    resolveAssistantPendingUi({
+      reasoningUiSupported: message.reasoningUiSupported,
+      isMinimalTurn,
+      isThinkingPhase,
+      showThinking,
+      isRegenerating,
+      hasProgressLabel: Boolean(progressLabel),
+    });
 
   const enterAnimation =
     message.role === "user"
@@ -185,27 +169,24 @@ export function ChatMessageRow({
     <MessageScrollerItem messageId={message.id} scrollAnchor={scrollAnchor}>
       <Message align="start">
         <MessageContent>
-          {showThoughtHeader ? (
-            <Reasoning
-              className="w-full"
-              collapsible={false}
-              defaultOpen={false}
-              duration={resolvedDurationSec}
-              isStreaming={showThinkingUi || showLiveRegenerating}
-            >
-              <ReasoningTrigger
-                showChevron={false}
-                showDurationLabel={false}
-                getThinkingMessage={(isStreaming) => {
-                  if (!showLiveRegenerating || !progressLabel) return null;
-                  return isStreaming ? (
-                    <span className="shimmer text-muted-foreground">{progressLabel}</span>
-                  ) : (
-                    <span>{progressLabel}</span>
-                  );
-                }}
+          {showBrainIcon ? (
+            <span role="status" aria-label="Thinking" className="inline-flex">
+              <HugeiconsIcon
+                icon={Brain03Icon}
+                strokeWidth={2}
+                className="size-4 animate-pulse text-muted-foreground motion-reduce:animate-none"
               />
-            </Reasoning>
+            </span>
+          ) : null}
+          {showThinkingShimmer ? (
+            <p className="mb-2 shimmer text-sm text-muted-foreground md:text-[0.9375rem]">
+              Thinking…
+            </p>
+          ) : null}
+          {showRetryStatus && progressLabel ? (
+            <p className="mb-2 shimmer text-sm text-muted-foreground md:text-[0.9375rem]">
+              {progressLabel}
+            </p>
           ) : null}
           {displayContent.trim() ? (
             <Bubble variant="ghost">

@@ -13,19 +13,22 @@ import { GeistSans } from "geist/font/sans";
 import { GeistMono } from "geist/font/mono";
 import { cn } from "@/lib/utils";
 import {
+  APEX_ORIGIN,
+  CHAT_OG_IMAGE_URL,
   CHAT_SEO_DESCRIPTION,
   CHAT_SEO_TITLE,
+  CHAT_SHARE_URL,
   SITE_ORIGIN,
 } from "@/lib/page-seo";
 import { getTurnstileSiteKey } from "@/lib/turnstile-config";
 
 /**
  * Static metadata so the HTML shell can prerender (no headers() → no per-request SSR).
- * Canonical and OG stay on the subdomain for SEO consolidation; apex /chat unfurls
- * still resolve og:image against SITE_ORIGIN.
+ * Crawl/share tags point at apex /chat; favicons stay on the chat subdomain
+ * (apex /favicon* is the calendar Pages app).
  */
 export const metadata: Metadata = {
-  metadataBase: new URL(SITE_ORIGIN),
+  metadataBase: new URL(APEX_ORIGIN),
   title: {
     default: CHAT_SEO_TITLE,
     template: "%s",
@@ -47,7 +50,7 @@ export const metadata: Metadata = {
     "Bila UiTM Cuti Chat",
   ],
   generator: "Next.js",
-  authors: [{ name: "Bila UiTM Cuti", url: SITE_ORIGIN }],
+  authors: [{ name: "Bila UiTM Cuti", url: APEX_ORIGIN }],
   creator: "Bila UiTM Cuti",
   category: "education",
   robots: {
@@ -59,18 +62,18 @@ export const metadata: Metadata = {
     },
   },
   alternates: {
-    canonical: SITE_ORIGIN,
+    canonical: CHAT_SHARE_URL,
   },
   openGraph: {
     siteName: "Bila UiTM Cuti Chat",
     title: CHAT_SEO_TITLE,
     description: CHAT_SEO_DESCRIPTION,
     type: "website",
-    url: SITE_ORIGIN,
+    url: CHAT_SHARE_URL,
     locale: "ms_MY",
     images: [
       {
-        url: "/chat.png",
+        url: CHAT_OG_IMAGE_URL,
         width: 1200,
         height: 630,
         alt: CHAT_SEO_TITLE,
@@ -81,7 +84,7 @@ export const metadata: Metadata = {
     card: "summary_large_image",
     title: CHAT_SEO_TITLE,
     description: CHAT_SEO_DESCRIPTION,
-    images: ["/chat.png"],
+    images: [CHAT_OG_IMAGE_URL],
   },
   icons: {
     icon: [
@@ -140,17 +143,17 @@ export default function RootLayout({
               "@graph": [
                 {
                   "@type": "Organization",
-                  "@id": `${SITE_ORIGIN}/#organization`,
+                  "@id": `${APEX_ORIGIN}/#organization`,
                   name: "Bila UiTM Cuti",
-                  url: "https://bilauitmcuti.com",
+                  url: APEX_ORIGIN,
                 },
                 {
                   "@type": "WebSite",
-                  "@id": `${SITE_ORIGIN}/#website`,
-                  url: SITE_ORIGIN,
-                  name: "Bila UiTM Cuti Chat",
+                  "@id": `${APEX_ORIGIN}/#website`,
+                  url: APEX_ORIGIN,
+                  name: "Bila UiTM Cuti",
                   description: CHAT_SEO_DESCRIPTION,
-                  publisher: { "@id": `${SITE_ORIGIN}/#organization` },
+                  publisher: { "@id": `${APEX_ORIGIN}/#organization` },
                   inLanguage: ["ms-MY", "en"],
                 },
               ],
@@ -197,8 +200,8 @@ export default function RootLayout({
               <PageSeoBlock
                 heading={CHAT_SEO_TITLE}
                 description={CHAT_SEO_DESCRIPTION}
-                url={SITE_ORIGIN}
-                breadcrumbs={[{ name: "Chat", item: SITE_ORIGIN }]}
+                url={CHAT_SHARE_URL}
+                breadcrumbs={[{ name: "Chat", item: CHAT_SHARE_URL }]}
               />
               <ChatCalendarBootstrap />
               {children}

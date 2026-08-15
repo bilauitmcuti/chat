@@ -1,4 +1,4 @@
-/** Canonical origin — SEO consolidates here (subdomain), even for apex /chat. */
+/** Chat Worker custom domain — favicons and Worker-only assets. */
 export const SITE_ORIGIN = "https://chat.bilauitmcuti.com";
 
 /** Apex origin serving the chat UI under the /chat path route. */
@@ -6,6 +6,12 @@ export const APEX_ORIGIN = "https://bilauitmcuti.com";
 
 /** Path the chat UI is served under on the apex host. */
 export const CHAT_PATH = "/chat";
+
+/** Public crawl/share URL — OG, canonical, and JSON-LD consolidate here (not the subdomain). */
+export const CHAT_SHARE_URL = `${APEX_ORIGIN}${CHAT_PATH}`;
+
+/** OG image on apex; `bilauitmcuti.com/chat*` already routes `/chat.png` to this Worker. */
+export const CHAT_OG_IMAGE_URL = `${APEX_ORIGIN}/chat.png`;
 
 export interface SeoTargets {
   /** metadataBase — relative OG/twitter images resolve same-origin as the served host. */
@@ -19,9 +25,8 @@ function normalizeSeoHost(host?: string | null): string {
 }
 
 /**
- * Per-host OG targets. Apex serves the UI at /chat, subdomain at root. Keeps social
- * previews self-referential (same-origin image, matching og:url) so link unfurls work
- * on both hosts. Canonical stays on SITE_ORIGIN regardless (see alternates.canonical).
+ * Per-host asset origin vs share URL. Crawl tags should use CHAT_SHARE_URL (apex /chat),
+ * not the subdomain. This helper remains for host-specific asset resolution.
  */
 export function resolveSeoTargets(host?: string | null): SeoTargets {
   const normalized = normalizeSeoHost(host);
@@ -40,7 +45,7 @@ export function buildSiteNavigationSchemaElements() {
     {
       "@type": "WebPage" as const,
       name: CHAT_SEO_TITLE,
-      url: SITE_ORIGIN,
+      url: CHAT_SHARE_URL,
       description: CHAT_SEO_DESCRIPTION,
     },
   ];

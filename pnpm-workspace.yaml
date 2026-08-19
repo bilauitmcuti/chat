@@ -16,7 +16,7 @@ overrides:
   hono: ">=4.12.34"
   fast-uri: ">=3.1.5"
   ip-address: ">=10.3.1"
-  path-to-regexp: ">=8.4.0"
+  "path-to-regexp@8": ">=8.4.0"
   mermaid: ">=11.16.1"
   dompurify: ">=3.4.12"
   undici: ">=7.29.0"

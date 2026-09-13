@@ -14,21 +14,35 @@ describe("group-a-sessions", () => {
     expect(isGroupASessionId("A-20251")).toBe(false);
   });
 
+  it("excludes Mar - Aug 2026 (B-20262) from dropdown meta", () => {
+    const meta = applyGroupASessionsToMeta({
+      defaultSession: { A: "A-20264", B: "B-20262" },
+      sessionOptions: [
+        { id: "B-20262", label: "Mar - Aug 2026", group: "B" },
+        { id: "B-20264", label: "Sep 2026 - Feb 2027", group: "B" },
+      ],
+      programOptions: [],
+    });
+    expect(meta.sessionOptions.map((s) => s.id)).toEqual(["B-20264"]);
+    expect(meta.defaultSession.B).toBe("B-20264");
+  });
+
   it("filters API meta to configured Group A sessions", () => {
     const meta = applyGroupASessionsToMeta({
-      defaultSession: { A: "A-20251", B: "B-20263" },
+      defaultSession: { A: "A-20251", B: "B-20262" },
       sessionOptions: [
         { id: "A-20251", label: "Dec 2025 - May 2026", group: "A" },
         { id: "A-20264", label: "Jun - Oct 2026", group: "A" },
         { id: "A-20272", label: "Sep 2026 - Feb 2027", group: "A" },
-        { id: "B-20263", label: "Mar - Aug 2026", group: "B" },
+        { id: "B-20262", label: "Mar - Aug 2026", group: "B" },
+        { id: "B-20263", label: "Sep 2026 - Feb 2027", group: "B" },
       ],
       programOptions: [],
     });
     expect(meta.sessionOptions.map((s) => s.id)).toEqual(["A-20264", "A-20272", "B-20263"]);
     expect(meta.defaultSession).toEqual({
       A: GROUP_A_DEFAULT_SESSION_ID,
-      B: "B-20263",
+      B: "B-20264",
     });
   });
 });

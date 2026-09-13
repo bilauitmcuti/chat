@@ -213,7 +213,7 @@ export interface SessionOptionLike {
 }
 
 /**
- * Normalize session label for UI and always append id, e.g. "Mar - Aug 2026 (B-20263)".
+ * Normalize session label for UI and always append id, e.g. "Mar - Aug 2026 (B-20262)".
  */
 export function formatSessionLabelWithId(session: Pick<SessionOptionLike, "id" | "label">): string {
   const baseLabel = session.label.replace(/^Group [AB]:\s*/, "").trim();

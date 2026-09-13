@@ -4,7 +4,7 @@ import { resolveLectureWeekMapForSessions } from "./lecture-weeks-resolve";
 describe("resolveLectureWeekMapForSessions", () => {
   const lectureWeekBySession = {
     "B-20272": { "2026-07-08": 14 },
-    "B-20263": { "2026-07-08": 3 },
+    "B-20264": { "2026-07-08": 3 },
   };
 
   it("merges only selected sessions", () => {

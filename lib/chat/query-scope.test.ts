@@ -8,18 +8,18 @@ import {
   type ResolvedQueryScope,
 } from "@/lib/chat/query-scope";
 
-const validIds = new Set(["A-20264", "A-20272", "B-20262", "B-20263", "B-20264"]);
+const validIds = new Set(["A-20264", "A-20272", "B-20262", "B-20264"]);
 
 describe("extractMentionedSessionIds", () => {
   it("finds explicit session ids with dash", () => {
-    expect(extractMentionedSessionIds("Compare B-20263 and B-20264", validIds)).toEqual([
-      "B-20263",
+    expect(extractMentionedSessionIds("Compare B-20262 and B-20264", validIds)).toEqual([
+      "B-20262",
       "B-20264",
     ]);
   });
 
   it("handles @mention without dash", () => {
-    expect(extractMentionedSessionIds("Tarikh @B20263 bila?", validIds)).toEqual(["B-20263"]);
+    expect(extractMentionedSessionIds("Tarikh @B20264 bila?", validIds)).toEqual(["B-20264"]);
   });
 
   it("ignores ids not in meta", () => {
@@ -52,8 +52,8 @@ describe("mergeSessionsForLoad", () => {
       relativeId: null,
       relativeKind: null,
     };
-    const result = mergeSessionsForLoad(["B-20263"], scope, "B", getGroup);
-    expect(result.sort()).toEqual(["B-20263", "B-20264"]);
+    const result = mergeSessionsForLoad(["B-20262"], scope, "B", getGroup);
+    expect(result.sort()).toEqual(["B-20262", "B-20264"]);
   });
 
   it("drops mentioned ids from other groups", () => {
@@ -62,8 +62,8 @@ describe("mergeSessionsForLoad", () => {
       relativeId: null,
       relativeKind: null,
     };
-    const result = mergeSessionsForLoad(["B-20263"], scope, "B", getGroup);
-    expect(result).toEqual(["B-20263"]);
+    const result = mergeSessionsForLoad(["B-20264"], scope, "B", getGroup);
+    expect(result).toEqual(["B-20264"]);
   });
 
   it("includes relative target when present", () => {
@@ -72,15 +72,15 @@ describe("mergeSessionsForLoad", () => {
       relativeId: "B-20264",
       relativeKind: "next",
     };
-    const result = mergeSessionsForLoad(["B-20263"], scope, "B", getGroup);
-    expect(result.sort()).toEqual(["B-20263", "B-20264"]);
+    const result = mergeSessionsForLoad(["B-20262"], scope, "B", getGroup);
+    expect(result.sort()).toEqual(["B-20262", "B-20264"]);
   });
 });
 
 describe("buildQueryScopeBlock", () => {
   it("returns empty string when no mention or relative", () => {
     const scope = resolveQueryScope("Bila cuti?", "B", validIds, "2026-03-15");
-    expect(buildQueryScopeBlock(scope, ["B-20263"])).toBe("");
+    expect(buildQueryScopeBlock(scope, ["B-20264"])).toBe("");
   });
 
   it("emits mentioned and selected lines", () => {
@@ -89,8 +89,8 @@ describe("buildQueryScopeBlock", () => {
       relativeId: null,
       relativeKind: null,
     };
-    const block = buildQueryScopeBlock(scope, ["B-20263"]);
+    const block = buildQueryScopeBlock(scope, ["B-20262"]);
     expect(block).toContain("MENTIONED SESSION(S): B-20264");
-    expect(block).toContain("SELECTED SESSION(S): B-20263");
+    expect(block).toContain("SELECTED SESSION(S): B-20262");
   });
 });

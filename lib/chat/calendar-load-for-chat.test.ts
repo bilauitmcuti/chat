@@ -52,10 +52,10 @@ function createFetchMock() {
 }
 
 const TEST_META = {
-  defaultSession: { A: "A-20261", B: "B-20263" },
+  defaultSession: { A: "A-20261", B: "B-20264" },
   sessionOptions: [
     { id: "A-20261", label: "Group A S1", group: "A" as const },
-    { id: "B-20263", label: "Group B S1", group: "B" as const },
+    { id: "B-20262", label: "Group B S1", group: "B" as const },
     { id: "B-20264", label: "Group B S2", group: "B" as const },
   ],
   programOptions: [{ value: "All", label: "All Programs", group: "B" as const }],
@@ -75,12 +75,12 @@ describe("chat calendar load per session", () => {
     setMeta(TEST_META);
 
     const { loadActivitiesIntoStoreForChat } = await import("@/lib/chat-calendar-load");
-    await loadActivitiesIntoStoreForChat("All", "B", ["B-20263", "B-20264"]);
+    await loadActivitiesIntoStoreForChat("All", "B", ["B-20262", "B-20264"]);
 
     const calendarUrls = fetchMock.mock.calls
       .map(([url]) => String(url))
       .filter((u) => u.includes("/api/v1/calendar"));
-    expect(calendarUrls.some((u) => u.includes("session=B-20263"))).toBe(true);
+    expect(calendarUrls.some((u) => u.includes("session=B-20262"))).toBe(true);
     expect(calendarUrls.some((u) => u.includes("session=B-20264"))).toBe(true);
   });
 
@@ -93,7 +93,7 @@ describe("chat calendar load per session", () => {
 
     const { loadActivitiesIntoStoreForChat } = await import("@/lib/chat-calendar-load");
 
-    await loadActivitiesIntoStoreForChat("All", "B", ["B-20263"]);
+    await loadActivitiesIntoStoreForChat("All", "B", ["B-20262"]);
     const firstBatch = fetchMock.mock.calls
       .map(([url]) => String(url))
       .filter((u) => u.includes("/api/v1/calendar"));
@@ -105,9 +105,9 @@ describe("chat calendar load per session", () => {
       .map(([url]) => String(url))
       .filter((u) => u.includes("/api/v1/calendar"));
 
-    expect(firstBatch.some((u) => u.includes("session=B-20263"))).toBe(true);
+    expect(firstBatch.some((u) => u.includes("session=B-20262"))).toBe(true);
     expect(secondBatch.some((u) => u.includes("session=B-20264"))).toBe(true);
-    expect(secondBatch.some((u) => u.includes("session=B-20263"))).toBe(false);
+    expect(secondBatch.some((u) => u.includes("session=B-20262"))).toBe(false);
   });
 
   it("buildPublicHolidayChatContext fetches public-holiday API for resolved year", async () => {
@@ -123,7 +123,7 @@ describe("chat calendar load per session", () => {
     const ctx = await buildPublicHolidayChatContext(
       "Senarai cuti umum 2026",
       "2026-03-15",
-      { sessionIds: ["B-20263"] }
+      { sessionIds: ["B-20264"] }
     );
 
     expect(ctx.block).toContain("Hari Merdeka");

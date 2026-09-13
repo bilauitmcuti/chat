@@ -24,8 +24,8 @@ vi.mock("@/lib/cookie-utils", async (importOriginal) => {
       showBreak: true,
       showCountdown: true,
       selectedProgram: "All" as ProgramValue,
-      sessionIds: ["B-20263"],
-      sessionId: "B-20263",
+      sessionIds: ["B-20264"],
+      sessionId: "B-20264",
     })),
     setFiltersToCookie: vi.fn(),
   };
@@ -37,8 +37,8 @@ describe("areProgramSessionMapsEqual", () => {
   it("treats missing keys as empty lists", () => {
     expect(
       areProgramSessionMapsEqual(
-        { All: ["B-20263"] },
-        { All: ["B-20263"], "Foundation/Professional": [] }
+        { All: ["B-20264"] },
+        { All: ["B-20264"], "Foundation/Professional": [] }
       )
     ).toBe(true);
   });
@@ -46,8 +46,8 @@ describe("areProgramSessionMapsEqual", () => {
   it("detects order-sensitive list mismatches", () => {
     expect(
       areProgramSessionMapsEqual(
-        { All: ["B-20263", "B-20262"] },
-        { All: ["B-20262", "B-20263"] }
+        { All: ["B-20264", "B-20262"] },
+        { All: ["B-20262", "B-20264"] }
       )
     ).toBe(false);
   });
@@ -57,16 +57,16 @@ describe("isChatSelectionInSyncWithHomepage", () => {
   it("is true when program, sessions, and map match", () => {
     const current: ChatHomepageHydration = {
       program: "Bachelor",
-      selectedSessions: ["B-20263"],
-      sessionsByProgram: { All: ["B-20263"] },
+      selectedSessions: ["B-20264"],
+      sessionsByProgram: { All: ["B-20264"] },
     };
     expect(isChatSelectionInSyncWithHomepage(current, { ...current })).toBe(true);
   });
 
   it("is false when program differs", () => {
     const base = {
-      selectedSessions: ["B-20263"] as ChatHomepageHydration["selectedSessions"],
-      sessionsByProgram: { All: ["B-20263"] },
+      selectedSessions: ["B-20264"] as ChatHomepageHydration["selectedSessions"],
+      sessionsByProgram: { All: ["B-20264"] },
     };
     expect(
       isChatSelectionInSyncWithHomepage(
@@ -80,10 +80,10 @@ describe("isChatSelectionInSyncWithHomepage", () => {
 describe("mergeSessionMapsFromHomepage", () => {
   it("lets cookie overwrite overlapping local keys", () => {
     const filters = {
-      sessionIdsByProgram: { All: ["B-20262"] },
+      sessionIdsByProgram: { All: ["B-20264"] },
     } as FilterStates;
-    const merged = mergeSessionMapsFromHomepage({ All: ["B-20263"] }, filters);
-    expect(merged.All).toEqual(["B-20262"]);
+    const merged = mergeSessionMapsFromHomepage({ All: ["B-20262"] }, filters);
+    expect(merged.All).toEqual(["B-20264"]);
   });
 });
 
@@ -110,23 +110,23 @@ describe("persistChatProgramSessions", () => {
   it("writes localStorage and merges filter toggles into the cookie", () => {
     persistChatProgramSessions({
       program: "Bachelor",
-      sessionsByProgram: { All: ["B-20263", "B-20262"] },
-      selectedSessions: ["B-20263", "B-20262"],
+      sessionsByProgram: { All: ["B-20264"] },
+      selectedSessions: ["B-20264"],
     });
 
     expect(setItem).toHaveBeenCalledWith("selectedProgram", "Bachelor");
     expect(setItem).toHaveBeenCalledWith(
       "sessionIdsByProgram",
-      JSON.stringify({ All: ["B-20263", "B-20262"] })
+      JSON.stringify({ All: ["B-20264"] })
     );
     expect(getFiltersFromCookie).toHaveBeenCalled();
     expect(setFiltersToCookie).toHaveBeenCalledWith(
       expect.objectContaining({
         showKKT: true,
         selectedProgram: "Bachelor",
-        sessionId: "B-20263",
-        sessionIds: ["B-20263", "B-20262"],
-        sessionIdsByProgram: { All: ["B-20263", "B-20262"] },
+        sessionId: "B-20264",
+        sessionIds: ["B-20264"],
+        sessionIdsByProgram: { All: ["B-20264"] },
       })
     );
   });
@@ -134,7 +134,7 @@ describe("persistChatProgramSessions", () => {
   it("skips empty selectedSessions", () => {
     persistChatProgramSessions({
       program: "Bachelor",
-      sessionsByProgram: { All: ["B-20263"] },
+      sessionsByProgram: { All: ["B-20264"] },
       selectedSessions: [],
     });
     expect(setFiltersToCookie).not.toHaveBeenCalled();

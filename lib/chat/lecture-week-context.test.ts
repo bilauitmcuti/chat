@@ -59,7 +59,7 @@ describe("needsLectureWeekTable", () => {
 
 describe("formatLectureWeeksTable", () => {
   it("renders all weeks with count header", () => {
-    const block = formatLectureWeeksTable("B-20263", sampleWeeks);
+    const block = formatLectureWeeksTable("B-20264", sampleWeeks);
     expect(block).toContain("WEEK_COUNT: 1");
     expect(block).toContain("Week 3: 15-02-2026 to 21-02-2026");
   });

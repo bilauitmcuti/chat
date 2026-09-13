@@ -41,7 +41,7 @@ describe("parseTodayResponse", () => {
       date: "2026-03-09",
       primaryStatus: "exam_week",
       statuses: ["exam_week"],
-      sessionResolved: { id: "B-20263", label: "Sesi", group: "B" },
+      sessionResolved: { id: "B-20264", label: "Sesi", group: "B" },
       matchedActivities: [
         {
           name: "Peperiksaan Akhir",

@@ -51,7 +51,7 @@ const peperiksaan: Activity = {
 };
 
 const pool = (activities: Activity[]) =>
-  activities.map((activity) => ({ activity, sessionId: "B-20263" as const }));
+  activities.map((activity) => ({ activity, sessionId: "B-20264" as const }));
 
 describe("extractActivityAliases", () => {
   it("extracts parenthetical abbreviations", () => {
@@ -105,7 +105,7 @@ describe("matchActivitiesInMessage", () => {
 describe("formatClosestActivitiesBlock", () => {
   it("includes closest matches header", () => {
     const block = formatClosestActivitiesBlock([
-      { activity: sufoActivity, sessionId: "B-20263", score: 40 },
+      { activity: sufoActivity, sessionId: "B-20264", score: 40 },
     ]);
     expect(block).toContain("CLOSEST MATCHES");
     expect(block).toContain("SuFO");

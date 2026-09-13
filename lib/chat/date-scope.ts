@@ -247,7 +247,7 @@ export function resolveDateScope(message: string, todayISO: string): DateScope |
   return null;
 }
 
-/** Avoid treating session ids (B-20263) or casual mentions as a day-scope filter. */
+/** Avoid treating session ids (B-20264) or casual mentions as a day-scope filter. */
 function messageExplicitlyRequestsDayScope(message: string, parsedISO: string): boolean {
   const lower = message.toLowerCase();
   if (/\b(today|hari ini|tomorrow|esok|besok|yesterday|semalam)\b/.test(lower)) {

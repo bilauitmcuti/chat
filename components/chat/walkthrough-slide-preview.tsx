@@ -14,7 +14,7 @@ import { cn } from "@/lib/utils";
 const CHAT_PREVIEW_TURNS = [
   {
     user: "When does lecture start?",
-    reply: "Lecture 1 starts **3 Mar 2026** (Group B, Session B-20263).",
+    reply: "Lecture 1 starts **3 Mar 2026** (Group B, Session B-20264).",
   },
   {
     user: "What about mid-semester break?",

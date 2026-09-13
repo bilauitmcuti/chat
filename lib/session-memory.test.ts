@@ -18,13 +18,13 @@ describe("session-memory", () => {
   });
 
   it("filters sessions by group prefix", () => {
-    expect(normalizeSessionsForGroup(["A-20251", "B-20263"], "A")).toEqual([]);
-    expect(normalizeSessionsForGroup(["A-20251", "B-20263"], "B")).toEqual(["B-20263"]);
+    expect(normalizeSessionsForGroup(["A-20251", "B-20264"], "A")).toEqual([]);
+    expect(normalizeSessionsForGroup(["A-20251", "B-20264"], "B")).toEqual(["B-20264"]);
     expect(normalizeSessionsForGroup(["B-20262", "B-20264"], "B")).toEqual(["B-20264"]);
   });
 
   it("compares session lists in order", () => {
     expect(areSessionListsEqual(["A-20251"], ["A-20251"])).toBe(true);
-    expect(areSessionListsEqual(["A-20251", "B-20263"], ["B-20263", "A-20251"])).toBe(false);
+    expect(areSessionListsEqual(["A-20251", "B-20264"], ["B-20264", "A-20251"])).toBe(false);
   });
 });

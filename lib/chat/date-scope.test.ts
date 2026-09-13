@@ -44,8 +44,8 @@ describe("resolveDateScope", () => {
   });
 
   it("does not scope on session id alone", () => {
-    expect(resolveDateScope("When is registration for B-20263?", TODAY)).toBeNull();
-    expect(messageExplicitlyRequestsDateScope("When is registration for B-20263?")).toBe(
+    expect(resolveDateScope("When is registration for B-20264?", TODAY)).toBeNull();
+    expect(messageExplicitlyRequestsDateScope("When is registration for B-20264?")).toBe(
       false
     );
   });

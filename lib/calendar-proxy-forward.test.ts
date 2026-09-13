@@ -15,9 +15,9 @@ describe("calendar-proxy-forward", () => {
 
   it("whitelists calendar query keys", () => {
     const request = new NextRequest(
-      "http://localhost/api/v1/calendar?session=B-20263&program=Diploma&foo=bar"
+      "http://localhost/api/v1/calendar?session=B-20264&program=Diploma&foo=bar"
     );
-    expect(buildForwardedSearch("v1/calendar", request)).toBe("?session=B-20263&program=Diploma");
+    expect(buildForwardedSearch("v1/calendar", request)).toBe("?session=B-20264&program=Diploma");
   });
 
   it("normalizes boolean allSessions query", () => {
@@ -74,7 +74,7 @@ describe("calendarProxyForward lecture week enrichment", () => {
     vi.stubGlobal("fetch", fetchMock);
 
     const request = new NextRequest(
-      "http://localhost/api/v1/calendar?session=B-20263&group=B&program=All"
+      "http://localhost/api/v1/calendar?session=B-20264&group=B&program=All"
     );
     const response = await calendarProxyForward(request, "v1/calendar");
     expect(response.status).toBe(200);

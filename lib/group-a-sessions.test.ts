@@ -35,11 +35,11 @@ describe("group-a-sessions", () => {
         { id: "A-20264", label: "Jun - Oct 2026", group: "A" },
         { id: "A-20272", label: "Sep 2026 - Feb 2027", group: "A" },
         { id: "B-20262", label: "Mar - Aug 2026", group: "B" },
-        { id: "B-20263", label: "Sep 2026 - Feb 2027", group: "B" },
+        { id: "B-20264", label: "Sep 2026 - Feb 2027", group: "B" },
       ],
       programOptions: [],
     });
-    expect(meta.sessionOptions.map((s) => s.id)).toEqual(["A-20264", "A-20272", "B-20263"]);
+    expect(meta.sessionOptions.map((s) => s.id)).toEqual(["A-20264", "A-20272", "B-20264"]);
     expect(meta.defaultSession).toEqual({
       A: GROUP_A_DEFAULT_SESSION_ID,
       B: "B-20264",

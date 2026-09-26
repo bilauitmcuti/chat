@@ -24,6 +24,11 @@ function normalizeSeoHost(host?: string | null): string {
   return (host ?? "").replace(/^www\./, "").split(":")[0].toLowerCase();
 }
 
+/** Apex host only — the chat subdomain stays noindex so Google consolidates on /chat. */
+export function shouldAllowSearchIndexing(host?: string | null): boolean {
+  return normalizeSeoHost(host) === "bilauitmcuti.com";
+}
+
 /**
  * Per-host asset origin vs share URL. Crawl tags should use CHAT_SHARE_URL (apex /chat),
  * not the subdomain. This helper remains for host-specific asset resolution.

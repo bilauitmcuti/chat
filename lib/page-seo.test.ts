@@ -7,6 +7,7 @@ import {
   CHAT_SEO_TITLE,
   CHAT_SHARE_URL,
   resolveSeoTargets,
+  shouldAllowSearchIndexing,
   SITE_ORIGIN,
 } from "./page-seo";
 
@@ -24,6 +25,20 @@ describe("apex crawl URLs", () => {
   it("points share and OG image at bilauitmcuti.com, not the chat subdomain", () => {
     expect(CHAT_SHARE_URL).toBe("https://bilauitmcuti.com/chat");
     expect(CHAT_OG_IMAGE_URL).toBe("https://bilauitmcuti.com/chat.png");
+  });
+});
+
+describe("shouldAllowSearchIndexing", () => {
+  it("indexes only the apex host, including www", () => {
+    expect(shouldAllowSearchIndexing("bilauitmcuti.com")).toBe(true);
+    expect(shouldAllowSearchIndexing("www.bilauitmcuti.com")).toBe(true);
+    expect(shouldAllowSearchIndexing("BILAUITMCUTI.COM:443")).toBe(true);
+  });
+
+  it("keeps the chat subdomain, localhost, and missing host out of the index", () => {
+    expect(shouldAllowSearchIndexing("chat.bilauitmcuti.com")).toBe(false);
+    expect(shouldAllowSearchIndexing("localhost")).toBe(false);
+    expect(shouldAllowSearchIndexing(null)).toBe(false);
   });
 });
 

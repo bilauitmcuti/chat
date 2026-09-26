@@ -1,4 +1,5 @@
 import type { Metadata } from "next";
+import { headers } from "next/headers";
 import React, { Suspense } from "react";
 import { ThemeProvider } from "@/components/theme-provider";
 import { ThemeShortcut } from "@/components/theme-shortcut";
@@ -18,16 +19,17 @@ import {
   CHAT_SEO_DESCRIPTION,
   CHAT_SEO_TITLE,
   CHAT_SHARE_URL,
+  shouldAllowSearchIndexing,
   SITE_ORIGIN,
 } from "@/lib/page-seo";
 import { getTurnstileSiteKey } from "@/lib/turnstile-config";
 
 /**
- * Static metadata so the HTML shell can prerender (no headers() → no per-request SSR).
- * Crawl/share tags point at apex /chat; favicons stay on the chat subdomain
+ * Per-request metadata: robots follow the Host header so only apex /chat is indexed.
+ * Crawl/share tags always point at apex /chat; favicons stay on the chat subdomain
  * (apex /favicon* is the calendar Pages app).
  */
-export const metadata: Metadata = {
+const baseMetadata: Metadata = {
   metadataBase: new URL(APEX_ORIGIN),
   title: {
     default: CHAT_SEO_TITLE,
@@ -53,14 +55,6 @@ export const metadata: Metadata = {
   authors: [{ name: "Bila UiTM Cuti", url: APEX_ORIGIN }],
   creator: "Bila UiTM Cuti",
   category: "education",
-  robots: {
-    index: false,
-    follow: false,
-    googleBot: {
-      index: false,
-      follow: false,
-    },
-  },
   alternates: {
     canonical: CHAT_SHARE_URL,
   },
@@ -95,6 +89,30 @@ export const metadata: Metadata = {
     apple: `${SITE_ORIGIN}/apple-touch-icon.png`,
   },
 };
+
+export async function generateMetadata(): Promise<Metadata> {
+  const host = (await headers()).get("host");
+  const allowIndex = shouldAllowSearchIndexing(host);
+
+  return {
+    ...baseMetadata,
+    robots: {
+      index: allowIndex,
+      follow: allowIndex,
+      googleBot: {
+        index: allowIndex,
+        follow: allowIndex,
+        ...(allowIndex
+          ? {
+              "max-video-preview": -1,
+              "max-image-preview": "large" as const,
+              "max-snippet": -1,
+            }
+          : {}),
+      },
+    },
+  };
+}
 
 export const viewport = {
   width: "device-width",

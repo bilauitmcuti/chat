@@ -446,7 +446,11 @@ export async function POST(request: NextRequest) {
 
     let clefUnderstanding: ClefUnderstanding | null = null;
     let aiBindingEarly: Ai | null | undefined;
-    if (isClefUnderstandingEnabled() && !isMinimalTurn) {
+    if (
+      isClefUnderstandingEnabled() &&
+      !isMinimalTurn &&
+      !followUp.isClarifyingFollowUp
+    ) {
       aiBindingEarly = await getAiBinding();
       if (aiBindingEarly) {
         clefUnderstanding = await runClefUnderstanding({
@@ -528,6 +532,7 @@ export async function POST(request: NextRequest) {
       selectedProgram,
       effectiveSessions.join(","),
       topicRoute.topics.join("+"),
+      `intent:${contextIntent}`,
       hasMatchedActivity ? "matched" : "nomatch",
       wantsTableOutput ? "table" : "normal",
       sanitizedMessage,

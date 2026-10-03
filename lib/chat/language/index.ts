@@ -2,7 +2,7 @@ import type { ChatMessage } from "@/lib/ai";
 import { adaptHistoryForLanguage } from "@/lib/chat/language/history";
 import { buildLanguageLockMessage } from "@/lib/chat/language/lock";
 import { resolveLanguageProfile } from "@/lib/chat/language/profile";
-import type { LanguageProfile } from "@/lib/chat/language/types";
+import type { LanguageProfile, ReplyLanguage } from "@/lib/chat/language/types";
 import { verifyReplyLanguage } from "@/lib/chat/language/verify";
 
 export type {
@@ -59,6 +59,7 @@ export async function applyLanguageToTurn(options: {
   modelId?: string | null;
   correlationId?: string;
   skipLlm?: boolean;
+  clefReply?: { replyLanguage: ReplyLanguage; confidence: number } | null;
 }): Promise<ApplyLanguageToTurnResult> {
   const profile = await resolveLanguageProfile(options);
   const history = adaptHistoryForLanguage(options.history, profile);

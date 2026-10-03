@@ -7,6 +7,7 @@ import {
   MED_CONFIDENCE,
 } from "@/lib/chat/language/detect";
 import type { LanguageProfile, ReplyLanguage } from "@/lib/chat/language/types";
+import { CLEF_LANGUAGE_CONFIDENCE } from "@/lib/chat/clef/model";
 
 export interface ResolveLanguageProfileOptions {
   message: string;
@@ -16,6 +17,11 @@ export interface ResolveLanguageProfileOptions {
   /** Skip LLM classify (tests / offline). */
   skipLlm?: boolean;
   classifyLlm?: typeof classifyLanguageLlm;
+  /**
+   * High-confidence Clef language decision. Used only when the heuristic
+   * would otherwise call soft-JSON classify. Explicit overrides still win.
+   */
+  clefReply?: { replyLanguage: ReplyLanguage; confidence: number } | null;
 }
 
 function localeFor(lang: ReplyLanguage): "en" | "ms-MY" {
@@ -33,7 +39,8 @@ function needsLlmClassify(heuristic: ReturnType<typeof detectHeuristicLanguage>)
 
 /**
  * Resolve turn language profile: latest message > explicit override > sticky
- * history for short/low-confidence turns > soft-JSON classify when needed.
+ * history for short/low-confidence turns > Clef language when confident >
+ * soft-JSON classify when needed.
  */
 export async function resolveLanguageProfile(
   options: ResolveLanguageProfileOptions
@@ -85,6 +92,19 @@ export async function resolveLanguageProfile(
       locale: localeFor(heuristic.replyLanguage),
       codeSwitch: heuristic.codeSwitch || heuristic.replyLanguage === "mixed",
       confidence: heuristic.confidence,
+      stickyFromHistory: false,
+      explicitOverride: null,
+      usedLlmClassify: false,
+    };
+  }
+
+  const clefReply = options.clefReply;
+  if (clefReply && clefReply.confidence >= CLEF_LANGUAGE_CONFIDENCE) {
+    return {
+      replyLanguage: clefReply.replyLanguage,
+      locale: localeFor(clefReply.replyLanguage),
+      codeSwitch: clefReply.replyLanguage === "mixed",
+      confidence: clefReply.confidence,
       stickyFromHistory: false,
       explicitOverride: null,
       usedLlmClassify: false,

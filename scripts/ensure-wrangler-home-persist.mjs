@@ -79,40 +79,104 @@ for (const root of appleDoubleRoots) {
   );
 }
 
+function platformWorkerdPackageName() {
+  if (process.platform === "darwin") {
+    return process.arch === "arm64"
+      ? "@cloudflare/workerd-darwin-arm64"
+      : "@cloudflare/workerd-darwin-64";
+  }
+  if (process.platform === "linux") {
+    return process.arch === "arm64"
+      ? "@cloudflare/workerd-linux-arm64"
+      : "@cloudflare/workerd-linux-64";
+  }
+  if (process.platform === "win32") return "@cloudflare/workerd-windows-64";
+  return null;
+}
+
+/** Resolve the installed workerd binary from pnpm (never pin an old version). */
+function resolveProjectWorkerdBinary() {
+  const pkgName = platformWorkerdPackageName();
+  if (!pkgName) return null;
+
+  const direct = path.join(
+    projectRoot,
+    "node_modules",
+    pkgName,
+    "bin",
+    process.platform === "win32" ? "workerd.exe" : "workerd"
+  );
+  if (fs.existsSync(direct)) return direct;
+
+  const pnpmDir = path.join(projectRoot, "node_modules", ".pnpm");
+  if (!fs.existsSync(pnpmDir)) return null;
+
+  const prefix = `${pkgName.replace("/", "+")}@`;
+  const matches = fs
+    .readdirSync(pnpmDir)
+    .filter((entry) => entry.startsWith(prefix))
+    .sort();
+  const latest = matches.at(-1);
+  if (!latest) return null;
+
+  const fromPnpm = path.join(
+    pnpmDir,
+    latest,
+    "node_modules",
+    pkgName,
+    "bin",
+    process.platform === "win32" ? "workerd.exe" : "workerd"
+  );
+  return fs.existsSync(fromPnpm) ? fromPnpm : null;
+}
+
+function readWorkerdVersion(binaryPath) {
+  const result = spawnSync(binaryPath, ["--version"], { encoding: "utf8" });
+  const line = `${result.stdout ?? ""}${result.stderr ?? ""}`.trim();
+  const match = line.match(/workerd\s+(\S+)/i);
+  return match?.[1] ?? null;
+}
+
 /** Prefer workerd binary on APFS when the project lives on ExFAT. */
 function ensureWorkerdOnHomeVolume() {
-  const candidates = [
-    path.join(
-      projectRoot,
-      "node_modules/@cloudflare/workerd-darwin-arm64/bin/workerd"
-    ),
-    path.join(
-      projectRoot,
-      "node_modules/.pnpm/@cloudflare+workerd-darwin-arm64@1.20260526.1/node_modules/@cloudflare/workerd-darwin-arm64/bin/workerd"
-    ),
-  ];
-  const source = candidates.find((p) => fs.existsSync(p));
+  const source = resolveProjectWorkerdBinary();
   if (!source) return;
 
   const binDir = path.join(os.homedir(), ".cache", "buc-chat-bins");
-  const target = path.join(binDir, "workerd");
+  const target = path.join(
+    binDir,
+    process.platform === "win32" ? "workerd.exe" : "workerd"
+  );
+  const envFile = path.join(os.homedir(), ".cache", "buc-chat-wrangler-env");
   fs.mkdirSync(binDir, { recursive: true });
 
   try {
+    const sourceVersion = readWorkerdVersion(source);
+    const targetVersion = fs.existsSync(target) ? readWorkerdVersion(target) : null;
     const srcStat = fs.statSync(source);
     const dstStat = fs.existsSync(target) ? fs.statSync(target) : null;
-    if (!dstStat || dstStat.size !== srcStat.size || dstStat.mtimeMs < srcStat.mtimeMs) {
+    const shouldCopy =
+      !dstStat ||
+      dstStat.size !== srcStat.size ||
+      sourceVersion !== targetVersion;
+
+    if (shouldCopy) {
       fs.copyFileSync(source, target);
       fs.chmodSync(target, 0o755);
+      if (sourceVersion && sourceVersion !== targetVersion) {
+        console.log(
+          `[ensure-wrangler-home-persist] Updated cached workerd ${targetVersion ?? "none"} → ${sourceVersion}`
+        );
+      }
     }
+
     // Parent shell must export this — write a small env file for the dev wrapper.
-    fs.writeFileSync(
-      path.join(os.homedir(), ".cache", "buc-chat-wrangler-env"),
-      `MINIFLARE_WORKERD_PATH=${target}\n`,
-      "utf8"
+    fs.writeFileSync(envFile, `MINIFLARE_WORKERD_PATH=${target}\n`, "utf8");
+  } catch (error) {
+    console.warn(
+      "[ensure-wrangler-home-persist] Could not cache workerd on home volume:",
+      error instanceof Error ? error.message : error
     );
-  } catch {
-    // non-fatal
   }
 }
 

@@ -11,6 +11,8 @@ copy .env.example .env.local   # Windows — fill values before pnpm dev
 npx wrangler login             # required for local Workers AI binding
 ```
 
+**Local dev 503 / `compatibility date "2026-07-08"`:** `pnpm dev` sets `MINIFLARE_WORKERD_PATH` via [`scripts/ensure-wrangler-home-persist.mjs`](scripts/ensure-wrangler-home-persist.mjs) (ExFAT-safe workerd on `~/.cache/buc-chat-bins/workerd`). A stale cached binary (e.g. workerd `2026-05-26`) only supports dates up to `2026-06-02` while remote Workers AI needs `2026-07-08+`. Fix: `pnpm install`, run `node scripts/ensure-wrangler-home-persist.mjs` (updates the cache from the current install), verify `~/.cache/buc-chat-bins/workerd --version` is ≥ `2026-07-08`, then restart `pnpm dev`.
+
 ## Required Environment
 
 - **Workers AI binding** — required for chat. Declared in [`wrangler.jsonc`](wrangler.jsonc) as `ai.binding: "AI"`. No API key secret for inference. Access via `getCloudflareContext()` from `@opennextjs/cloudflare`.
@@ -24,6 +26,7 @@ npx wrangler login             # required for local Workers AI binding
 - `DISCORD_WEBHOOK_CHAT_HELPFUL` / `DISCORD_WEBHOOK_CHAT_NOT_HELPFUL` — chat AI thumbs up/down (`POST /chat/feedback/api`). Do not use `NEXT_PUBLIC_*` or commit URLs.
 - `CALENDAR_API_BASE` — optional server-only override for the calendar API origin (default `https://api.bilauitmcuti.com`). Browser uses same-origin `/api/v1/meta` and `/api/v1/calendar` (unchanged; shared calendar API surface, not under `/chat`).
 - `CHAT_USE_AGENT` — set to `0` or `false` to disable tool-calling agent globally. See [`lib/chat/agent/run-agent.ts`](lib/chat/agent/run-agent.ts).
+- `CHAT_USE_CLEF` — set to `0` or `false` to disable the Clef decision helper (`@cf/cloudflare/clef`). On by default. Clef is not a composer model; it classifies topic, calendar intent, day-status, and reply language before the chat model answers. See [`lib/chat/clef/`](lib/chat/clef/).
 - `AI_GATEWAY_ID` — AI Gateway name (default / production: `buc-chat`). Declared in [`wrangler.jsonc`](wrangler.jsonc) `vars` and local `.env.local`. Set to `off` to bypass.
 - `SKIP_AI_GATEWAY=1` — chat calls Workers AI directly without gateway.
 - `CHAT_USE_DYNAMIC_ROUTES=1` — opt-in AI Gateway Dynamic Routes (`dynamic/*`) for all picker models including Gemma. Default **off** (compat currently returns 400 Bad input for some models); chat uses `AI.run` + app Gemma fallback instead.
@@ -157,7 +160,7 @@ App mapping: [`lib/chat/dynamic-routes.ts`](lib/chat/dynamic-routes.ts). All dyn
 - `POST /chat/api` — SSE stream or JSON cache hit
 - `POST /chat/feedback/api` — thumbs feedback
 
-Pipeline: topic router → activity match → agent (Gemma) or compact fallback (Llama) → reply validation. See [`lib/chat/handler.ts`](lib/chat/handler.ts).
+Pipeline: topic router → activity match → Clef decision helper (`@cf/cloudflare/clef` via the Workers AI binding and AI Gateway, not a picker model) → agent or compact fallback → reply validation. See [`lib/chat/handler.ts`](lib/chat/handler.ts).
 
 ## Known Limitations
 

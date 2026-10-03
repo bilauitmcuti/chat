@@ -90,6 +90,28 @@ describe("resolveLanguageProfile", () => {
     expect(profile.usedLlmClassify).toBe(true);
   });
 
+  it("uses a confident Clef language decision instead of soft-JSON classify", async () => {
+    const classifyLlm = vi.fn();
+    const profile = await resolveLanguageProfile({
+      message: "ok week tu for diploma group?",
+      classifyLlm,
+      clefReply: { replyLanguage: "ms-MY", confidence: 0.72 },
+    });
+    expect(classifyLlm).not.toHaveBeenCalled();
+    expect(profile.replyLanguage).toBe("ms-MY");
+    expect(profile.usedLlmClassify).toBe(false);
+    expect(profile.confidence).toBeCloseTo(0.72);
+  });
+
+  it("keeps an explicit language override ahead of Clef", async () => {
+    const profile = await resolveLanguageProfile({
+      message: "Bila cuti? Please reply in English",
+      clefReply: { replyLanguage: "ms-MY", confidence: 0.9 },
+    });
+    expect(profile.replyLanguage).toBe("en");
+    expect(profile.explicitOverride).toBe("en");
+  });
+
   it("is model-agnostic (same profile regardless of modelId)", async () => {
     const a = await resolveLanguageProfile({
       message: "When is registration?",

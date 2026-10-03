@@ -76,6 +76,14 @@ import {
 } from "@/lib/chat/context";
 import { resolveCalendarContextIntent } from "@/lib/chat/calendar-intent";
 import {
+  buildClefUnderstandingDirective,
+  isClefUnderstandingEnabled,
+  mergeClefUnderstanding,
+  runClefUnderstanding,
+  CLEF_LANGUAGE_CONFIDENCE,
+  type ClefUnderstanding,
+} from "@/lib/chat/clef";
+import {
   buildDataContextForTurn,
   shouldUseCalendarIntentFilter,
   topicNeedsCalendarPrompt,
@@ -397,7 +405,7 @@ export async function POST(request: NextRequest) {
           : getFilteredGroupBActivities(selectedProgram, [fallbackId]);
     }
 
-    const contextIntent = resolveCalendarContextIntent(sanitizedMessage);
+    let contextIntent = resolveCalendarContextIntent(sanitizedMessage);
 
     const flatPool = flattenActivitiesWithSession(contextSessionIds, (sid) =>
       getFilteredActivitiesForSession(sid, selectedProgram, primaryGroup)
@@ -435,6 +443,32 @@ export async function POST(request: NextRequest) {
       };
     }
     const effectiveQuery = followUp.effectiveQuery;
+
+    let clefUnderstanding: ClefUnderstanding | null = null;
+    let aiBindingEarly: Ai | null | undefined;
+    if (isClefUnderstandingEnabled() && !isMinimalTurn) {
+      aiBindingEarly = await getAiBinding();
+      if (aiBindingEarly) {
+        clefUnderstanding = await runClefUnderstanding({
+          ai: aiBindingEarly,
+          message: sanitizedMessage,
+          history: sanitizedHistory,
+          heuristicRoute: topicRoute,
+          heuristicIntent: contextIntent,
+          hasMatchedActivity,
+          correlationId,
+        });
+        const merged = mergeClefUnderstanding({
+          heuristicRoute: topicRoute,
+          heuristicIntent: contextIntent,
+          clef: clefUnderstanding,
+          hasMatchedActivity,
+        });
+        topicRoute = merged.topicRoute;
+        contextIntent = merged.contextIntent;
+      }
+    }
+
     const useIntentFilter = shouldUseCalendarIntentFilter(topicRoute, activityMatches.length);
 
     const useAgentPath = isChatAgentEnabled();
@@ -505,9 +539,8 @@ export async function POST(request: NextRequest) {
       return cachedReply;
     }
 
-    const aiBindingPromise = getAiBinding();
-
-    const aiBinding = await aiBindingPromise;
+    const aiBinding =
+      aiBindingEarly !== undefined ? aiBindingEarly : await getAiBinding();
     if (!aiBinding) {
       const noAi = mapChatError(
         Object.assign(new Error("Workers AI binding not available"), { status: 503 })
@@ -700,11 +733,20 @@ export async function POST(request: NextRequest) {
         );
     // Language-control pipeline: profile + adapted history + trailing LANGUAGE LOCK
     // (scoped user message). Do not dump a long language directive into system prompt.
+    const clefLanguage =
+      clefUnderstanding?.replyLanguage &&
+      clefUnderstanding.replyLanguageConfidence >= CLEF_LANGUAGE_CONFIDENCE
+        ? {
+            replyLanguage: clefUnderstanding.replyLanguage,
+            confidence: clefUnderstanding.replyLanguageConfidence,
+          }
+        : null;
     const languageTurn = await applyLanguageToTurn({
       message: sanitizedMessage,
       history: sanitizedHistory,
       modelId,
       correlationId,
+      clefReply: clefLanguage,
     });
     const languageProfile: LanguageProfile = languageTurn.profile;
     const modelHistory = languageTurn.history;
@@ -724,11 +766,17 @@ export async function POST(request: NextRequest) {
       topicRoute.topics.includes("academic_calendar")
         ? getCalendarUnderstandingDirective(sanitizedMessage)
         : "";
+    const clefDirective = buildClefUnderstandingDirective(
+      clefUnderstanding,
+      topicRoute.topics,
+      contextIntent
+    );
 
     const completionSuffix = isMinimalTurn
       ? getMinimalChitchatInstruction()
       : getCompletionInstruction(isSimple, asksDetail, needsList, hasMatchedActivity) +
         understandingDirective +
+        clefDirective +
         publicHolidayDirective;
 
     const systemPromptWithCompletion =

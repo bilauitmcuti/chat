@@ -363,7 +363,7 @@ export function topicsMatch(a: string, b: string): boolean {
   return tokensA.some((t) => tokensB.has(t));
 }
 
-function classifyTopicFromText(text: string): string | null {
+export function classifyTopicFromText(text: string): string | null {
   const lower = text.toLowerCase();
   if (/\b(short semester|intersession|semester pendek)\b/i.test(lower)) {
     return "short semester dates";

@@ -2,12 +2,17 @@
 
 import {
   Collapsible,
+  CollapsibleContent,
   CollapsibleTrigger,
 } from "@/components/ui/collapsible";
 import { useControllableState } from "@/hooks/use-controllable-state";
 import { cn } from "@/lib/utils";
 import { HugeiconsIcon } from "@hugeicons/react";
 import { ArrowDown01Icon, ArrowRight01Icon } from "@hugeicons/core-free-icons";
+import { cjk } from "@streamdown/cjk";
+import { code } from "@streamdown/code";
+import { math } from "@streamdown/math";
+import { mermaid } from "@streamdown/mermaid";
 import type { ComponentProps, ReactNode } from "react";
 import {
   createContext,
@@ -17,8 +22,8 @@ import {
   useEffect,
   useMemo,
   useRef,
-  useState,
 } from "react";
+import { Streamdown } from "streamdown";
 
 import { formatThoughtCompletedLabel, thinkingDurationSecFromTimestamp } from "@/lib/chat/reasoning-gate";
 import { shouldScheduleAutoCollapse } from "@/lib/chat/reasoning-collapse";
@@ -42,7 +47,10 @@ export const useReasoning = () => {
   return context;
 };
 
-export type ReasoningProps = ComponentProps<typeof Collapsible> & {
+export type ReasoningProps = Omit<
+  ComponentProps<typeof Collapsible>,
+  "open" | "defaultOpen" | "onOpenChange"
+> & {
   isStreaming?: boolean;
   /** When false, render a static thinking row without collapse/chevron. */
   collapsible?: boolean;
@@ -169,7 +177,7 @@ export const Reasoning = memo(
           <Collapsible
             {...props}
             className={cn("not-prose mb-4", className)}
-            onOpenChange={(open) => handleOpenChange(open)}
+            onOpenChange={handleOpenChange}
             open={isOpen}
           >
             {children}
@@ -201,10 +209,10 @@ const defaultGetThinkingMessage = (
   showDurationLabel = false
 ) => {
   if (isStreaming) {
-    return <span className="shimmer text-muted-foreground">Thinking…</span>;
+    return "Thinking…";
   }
   if (showDurationLabel && duration !== undefined) {
-    return <span>{formatThoughtCompletedLabel(duration)}</span>;
+    return formatThoughtCompletedLabel(duration);
   }
   return null;
 };
@@ -228,36 +236,7 @@ export const ReasoningTrigger = memo(
       defaultGetThinkingMessage(isStreaming, duration, showDurationLabel);
 
     const resolvedMessage =
-      message ??
-      (showChevron && isStreaming ? (
-        <span className="shimmer text-muted-foreground">Thinking…</span>
-      ) : null);
-
-    const label = (
-      <span className="flex min-w-0 items-center gap-1.5 text-left">
-        {resolvedMessage}
-        {showChevron && resolvedMessage ? (
-          <span className="relative size-4 shrink-0" aria-hidden>
-            <HugeiconsIcon
-              icon={ArrowRight01Icon}
-              strokeWidth={2}
-              className={cn(
-                "absolute inset-0 size-4 transition-opacity duration-[160ms] ease-out",
-                isOpen ? "opacity-0" : "opacity-100"
-              )}
-            />
-            <HugeiconsIcon
-              icon={ArrowDown01Icon}
-              strokeWidth={2}
-              className={cn(
-                "absolute inset-0 size-4 transition-opacity duration-[160ms] ease-out",
-                isOpen ? "opacity-100" : "opacity-0"
-              )}
-            />
-          </span>
-        ) : null}
-      </span>
-    );
+      message ?? (showChevron && isStreaming ? "Thinking…" : null);
 
     if (!showChevron || !resolvedMessage) {
       return (
@@ -276,11 +255,48 @@ export const ReasoningTrigger = memo(
         )}
         {...props}
       >
-        {children ?? label}
+        {children ?? (
+          <span className="flex min-w-0 items-center gap-1.5 text-left">
+            <span className={cn(isStreaming && "shimmer")}>{resolvedMessage}</span>
+            <span className="relative size-4 shrink-0" aria-hidden>
+              <HugeiconsIcon
+                icon={ArrowRight01Icon}
+                strokeWidth={2}
+                className={cn(
+                  "absolute inset-0 size-4 transition-opacity duration-[160ms] ease-out",
+                  isOpen ? "opacity-0" : "opacity-100"
+                )}
+              />
+              <HugeiconsIcon
+                icon={ArrowDown01Icon}
+                strokeWidth={2}
+                className={cn(
+                  "absolute inset-0 size-4 transition-opacity duration-[160ms] ease-out",
+                  isOpen ? "opacity-100" : "opacity-0"
+                )}
+              />
+            </span>
+          </span>
+        )}
       </CollapsibleTrigger>
     );
   }
 );
 
+export type ReasoningContentProps = ComponentProps<typeof CollapsibleContent> & {
+  children: string;
+};
+
+const streamdownPlugins = { cjk, code, math, mermaid };
+
+export const ReasoningContent = memo(
+  ({ className, children, ...props }: ReasoningContentProps) => (
+    <CollapsibleContent className={cn("mt-4 text-sm text-muted-foreground", className)} {...props}>
+      <Streamdown plugins={streamdownPlugins}>{children}</Streamdown>
+    </CollapsibleContent>
+  )
+);
+
 Reasoning.displayName = "Reasoning";
 ReasoningTrigger.displayName = "ReasoningTrigger";
+ReasoningContent.displayName = "ReasoningContent";

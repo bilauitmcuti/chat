@@ -48,7 +48,7 @@ export const CHAT_MODELS: readonly ChatModelOption[] = [
     id: CHAT_MODEL_LLAMA_4_SCOUT,
     name: "Llama 4 Scout",
     description: "Quick everyday answers",
-    provider: "llama",
+    provider: "meta",
     functionCalling: true,
     reasoningUi: false,
   },

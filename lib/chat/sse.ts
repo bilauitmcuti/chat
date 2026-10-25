@@ -3,6 +3,7 @@ import {
   CHAT_TIMEOUT_MESSAGE,
   resolveChatErrorMessage,
 } from "@/lib/chat/user-messages";
+import type { ChatTraceStepPatch } from "@/lib/chat/trace-display";
 
 export const SSE_HEADERS: Record<string, string> = {
   "Content-Type": "text/event-stream; charset=utf-8",
@@ -37,6 +38,11 @@ export interface ChatStreamReasoningPayload {
   token?: string;
   text?: string;
   replace?: boolean;
+}
+
+/** Upsert one trace row (reasoning / tool / retry) by `step.id`. */
+export interface ChatStreamTraceStepPayload {
+  step: ChatTraceStepPatch;
 }
 
 export interface ChatStreamTokenPayload {
@@ -241,6 +247,7 @@ export interface ChatStreamHandlers {
   onError: (payload: ChatStreamErrorPayload) => void;
   onStatus?: (payload: ChatStreamStatusPayload) => void;
   onReasoning?: (payload: ChatStreamReasoningPayload) => void;
+  onTraceStep?: (payload: ChatStreamTraceStepPayload) => void;
   /** Fired before a server regenerates so the UI can drop partial tokens. */
   onReset?: (payload: ChatStreamResetPayload) => void;
 }
@@ -306,6 +313,9 @@ export async function consumeChatStream(
       handlers.onReset?.(data as ChatStreamResetPayload);
     } else if (event === "status") {
       handlers.onStatus?.(data as ChatStreamStatusPayload);
+    } else if (event === "trace_step") {
+      const payload = data as ChatStreamTraceStepPayload;
+      if (payload.step?.id) handlers.onTraceStep?.(payload);
     } else if (event === "reasoning") {
       const payload = data as ChatStreamReasoningPayload;
       if (payload.replace && payload.text) {

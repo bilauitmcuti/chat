@@ -59,6 +59,12 @@ import {
 import { CHAT_VERIFICATION_REQUIRED_MESSAGE } from "@/lib/chat/user-messages";
 import { captureThinkingMetadata } from "@/lib/chat/reasoning-gate";
 import {
+  finishTraceSteps,
+  REASONING_TRACE_STEP_ID,
+  upsertTraceStep,
+  type ChatTraceStepPatch,
+} from "@/lib/chat/trace-display";
+import {
   DEFAULT_CHAT_MODEL,
   getChatModel,
   getVisibleChatModels,
@@ -697,6 +703,19 @@ export default function ChatPage() {
                 liveDraft = next;
                 setStreamingDraft(next);
               };
+              const updateTrace = (patch: ChatTraceStepPatch) => {
+                setMessages((prev) =>
+                  prev.map((m) =>
+                    m.id === assistantId
+                      ? { ...m, traceSteps: upsertTraceStep(m.traceSteps ?? [], patch) }
+                      : m
+                  )
+                );
+              };
+              const upsertRetryStep = (message?: string) => {
+                if (!message?.trim()) return;
+                updateTrace({ id: "retry", kind: "retry", title: message, status: "running" });
+              };
               const streamPainter = createRafMarkdownStreamPainter(
                 (chunk) => {
                   syncDraft({
@@ -709,9 +728,12 @@ export default function ChatPage() {
               await consumeChatStream(
                 res,
                 {
-                  onReasoning: () => {
-                    /* Thinking shimmer only — ignore server reasoning paragraphs. */
+                  onReasoning: (payload) => {
+                    if (payload.text) {
+                      updateTrace({ id: REASONING_TRACE_STEP_ID, detail: payload.text });
+                    }
                   },
+                  onTraceStep: (payload) => updateTrace(payload.step),
                   onToken: (token) => {
                     if (!answerStarted && token.trim()) {
                       answerStarted = true;
@@ -723,6 +745,7 @@ export default function ChatPage() {
                                 lifecycle: ASSISTANT_LIFECYCLE.STREAMING,
                                 streamPhase: undefined,
                                 statusMessage: undefined,
+                                traceSteps: m.traceSteps && finishTraceSteps(m.traceSteps),
                               })
                             : m
                         )
@@ -732,6 +755,7 @@ export default function ChatPage() {
                   },
                   onStatus: (payload) => {
                     if (!payload.phase || !payload.message?.trim()) return;
+                    if (payload.phase === CHAT_STREAM_PHASE.RETRY) upsertRetryStep(payload.message);
                     setMessages((prev) =>
                       prev.map((m) =>
                         m.id === assistantId
@@ -752,6 +776,7 @@ export default function ChatPage() {
                     streamPainter.reset();
                     answerStarted = false;
                     syncDraft({ id: assistantId, content: "" });
+                    upsertRetryStep(payload.message);
                     setMessages((prev) =>
                       prev.map((m) =>
                         m.id === assistantId
@@ -806,6 +831,7 @@ export default function ChatPage() {
                             lifecycle: ASSISTANT_LIFECYCLE.COMPLETE,
                             streamPhase: undefined,
                             statusMessage: undefined,
+                            traceSteps: m.traceSteps && finishTraceSteps(m.traceSteps),
                           },
                           doneAt
                         );
@@ -846,6 +872,7 @@ export default function ChatPage() {
                           lifecycle: ASSISTANT_LIFECYCLE.SUBMITTED,
                           streamPhase: undefined,
                           statusMessage: undefined,
+                          traceSteps: undefined,
                         }
                       : m
                   )
@@ -946,6 +973,7 @@ export default function ChatPage() {
                       lifecycle: ASSISTANT_LIFECYCLE.ERROR,
                       streamPhase: undefined,
                       statusMessage: undefined,
+                      traceSteps: m.traceSteps && finishTraceSteps(m.traceSteps, "error"),
                     }
                   : m
               );
@@ -984,6 +1012,7 @@ export default function ChatPage() {
                   lifecycle: ASSISTANT_LIFECYCLE.ERROR,
                   streamPhase: undefined,
                   statusMessage: undefined,
+                  traceSteps: m.traceSteps && finishTraceSteps(m.traceSteps, "error"),
                 }
               : m
           )

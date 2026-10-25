@@ -279,3 +279,27 @@ describe("consumeChatStream reasoning", () => {
     expect(onReasoning).toHaveBeenCalledWith({ text: paragraph, replace: true });
   });
 });
+
+describe("consumeChatStream trace_step", () => {
+  it("invokes onTraceStep for trace rows and skips payloads without an id", async () => {
+    const onTraceStep = vi.fn();
+    const step = { id: "tool-1", kind: "tool", title: "Reading public holidays…", status: "running" };
+    const res = streamResponse([
+      encodeSseEvent("trace_step", { step }),
+      encodeSseEvent("trace_step", { step: {} }),
+      encodeSseEvent("trace_step", { step: { id: "tool-1", status: "done" } }),
+      encodeSseEvent("done", { reply: "Done", correlationId: "c1" }),
+    ]);
+
+    await consumeChatStream(res, {
+      onToken: () => {},
+      onTraceStep,
+      onDone: async () => {},
+      onError: () => {},
+    });
+
+    expect(onTraceStep).toHaveBeenCalledTimes(2);
+    expect(onTraceStep).toHaveBeenNthCalledWith(1, { step });
+    expect(onTraceStep).toHaveBeenNthCalledWith(2, { step: { id: "tool-1", status: "done" } });
+  });
+});

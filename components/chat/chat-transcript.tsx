@@ -74,7 +74,7 @@ export function ChatTranscript({
                 key={msg.id}
                 message={msg}
                 streamingDraft={streamingDraft?.id === msg.id ? streamingDraft : null}
-                scrollAnchor={false}
+                scrollAnchor={msg.role === "user"}
                 isLastUserMessage={msg.id === lastUserMsgId}
                 copiedId={copiedId}
                 reaction={reactions[msg.id]}

@@ -753,9 +753,9 @@ export function extractStreamParts(chunk: unknown): StreamDeltaParts {
   }
 
   const deltaReasoning = choice?.delta?.reasoning;
-  if (typeof deltaReasoning === "string") {
-    const fromReasoning = normalizeReasoningFallback(deltaReasoning);
-    if (fromReasoning) parts.reasoning = fromReasoning;
+  // Deltas are kept verbatim (including whitespace-only chunks) so accumulated tokens don't glue words together.
+  if (typeof deltaReasoning === "string" && deltaReasoning) {
+    parts.reasoning = deltaReasoning;
   }
   const messageReasoning = choice?.message?.reasoning;
   if (!parts.reasoning && typeof messageReasoning === "string") {

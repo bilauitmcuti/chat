@@ -8,6 +8,7 @@ import {
   CHAT_TIMEOUT_MESSAGE,
   resolveChatErrorMessage,
 } from "@/lib/chat/user-messages";
+import type { ChatTraceStep } from "@/lib/chat/trace-display";
 export {
   consumeChatStream,
   createMarkdownStreamPainter,
@@ -87,6 +88,8 @@ export interface ChatMessageItem {
   streamPhase?: string;
   /** Short status line from server pools for the current stream phase. */
   statusMessage?: string;
+  /** Ordered agent steps (reasoning, tools, retry) shown above the answer. */
+  traceSteps?: ChatTraceStep[];
 }
 
 /** Live token/reasoning draft kept outside `messages` to avoid full-list re-renders. */

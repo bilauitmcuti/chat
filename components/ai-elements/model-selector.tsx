@@ -58,6 +58,7 @@ export type ModelSelectorLogoProvider =
   | "fireworks-ai"
   | "modelscope"
   | "llama"
+  | "meta"
   | "scaleway"
   | "amazon-bedrock"
   | "cerebras"

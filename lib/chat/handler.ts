@@ -50,6 +50,10 @@ import { runDeterministicPrefetch } from "@/lib/chat/agent/deterministic-prefetc
 import {
   buildRetryStatusLine,
 } from "@/lib/chat/reasoning-status";
+import { buildReasoningOpener } from "@/lib/chat/reasoning-templates";
+import type { ChatTraceStepPatch } from "@/lib/chat/trace-display";
+import { createTurnTraceEmitter } from "@/lib/chat/trace-emitter";
+import { supportsReasoningUi } from "@/lib/chat/models";
 import { CHAT_STREAM_PHASE } from "@/lib/chat/stream-phase";
 import {
   buildReasoningComplexityInput,
@@ -334,11 +338,9 @@ export async function POST(request: NextRequest) {
     type StreamHooks = {
       enqueue: (text: string) => void;
       emitReasoningParagraph: (paragraph: string) => void;
+      emitTraceStep: (step: ChatTraceStepPatch) => void;
       emitStatus: (phase: string, message: string) => void;
       onToken: (token: string) => void;
-      onReasoningToken: (token: string) => void;
-      onToolCall: (toolName: string) => void;
-      onSynthesis: () => void;
       onRetry: (reason: string, statusMessage: string) => void;
     };
 
@@ -1202,12 +1204,36 @@ export async function POST(request: NextRequest) {
     };
 
     if (streamHooks) {
+      const showReasoningTrace = supportsReasoningUi(modelId) && !isMinimalTurn;
+      const trace = createTurnTraceEmitter({
+        userMessage: sanitizedMessage,
+        showReasoning: showReasoningTrace,
+        template:
+          showReasoningTrace && isComplexTurn
+            ? buildReasoningOpener({
+                message: sanitizedMessage,
+                topics: topicRoute.topics,
+                hasMatchedActivity,
+                activityMatches,
+                programLabel,
+                sessionCount: effectiveSessions.length,
+              })
+            : "",
+        emitStep: streamHooks.emitTraceStep,
+        emitReasoning: streamHooks.emitReasoningParagraph,
+      });
+      trace.start();
+
       const streamedReply = await runWithServerDeadline(
         getChatTurnDeadlineMs(executionMode),
         () =>
           runLlm((token) => {
+            trace.onAnswerToken();
             streamHooks.onToken(token);
           }, {
+            onReasoningToken: trace.onReasoningToken,
+            onToolCall: trace.onToolCall,
+            onSynthesis: trace.onSynthesis,
             onRetry: (reason) => {
               const retryReason =
                 reason === "dates"
@@ -1220,6 +1246,7 @@ export async function POST(request: NextRequest) {
           })
       );
 
+      trace.finish(streamedReply);
       setCachedReply(cacheKey, streamedReply);
       return streamedReply;
     }
@@ -1248,12 +1275,11 @@ export async function POST(request: NextRequest) {
             };
             const streamHooks: StreamHooks = {
               enqueue,
-              emitReasoningParagraph: () => {},
+              emitReasoningParagraph: (paragraph) =>
+                enqueue(encodeSseEvent("reasoning", { text: paragraph, replace: true })),
+              emitTraceStep: (step) => enqueue(encodeSseEvent("trace_step", { step })),
               emitStatus,
               onToken: (token) => enqueue(encodeSseEvent("token", { token })),
-              onReasoningToken: () => {},
-              onToolCall: () => {},
-              onSynthesis: () => {},
               onRetry: (reason, statusMessage) => {
                 enqueue(
                   encodeSseEvent("reset", {
